@@ -16,18 +16,30 @@ class AuthRepository implements AuthInterfaceRepository
        return User::create($data);
     }
 
-    public function login(array $credentials)
+    public function login(array $credentials): User
     {
-        
+        $user = User::where('telephone', $credentials['telephone'])->first();
+
+        if (!$user || !Hash::check($credentials['password'], $user->password)) {
+            throw new Exception('Invalid credentials');
+        }
+
+        return $user;
     }
 
-    public function logout()
+    public function logout(): void
     {
-        // Logic for user logout
+        // Revoke the current access token
+        $user = auth('api')->user();
+        if ($user) {
+            $user->tokens->each(function ($token) {
+                $token->delete();
+            });
+        }
     }
 
-    public function user()
+    public function user(): User
     {
-        // Logic to get the authenticated user
+        return auth('api')->user();
     }
 }

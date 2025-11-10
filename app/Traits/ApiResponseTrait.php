@@ -58,4 +58,30 @@ trait ApiResponseTrait
             return $this->errorResponse('Erreur interne du serveur.', 500);
         }
     }
+
+    // Réponse avec token
+    public function respondWithToken($token, string $message = 'Authentification réussie', $user = null): JsonResponse
+    {
+        try {
+            $response = [
+                'status' => 'success',
+                'message' => $message,
+                'access_token' => $token,
+                'token_type' => 'Bearer',
+            ];
+
+            if ($user) {
+                $response['user'] = new \App\Http\Resources\UserAuthResource($user);
+            }
+
+            return response()->json($response, 200);
+
+        } catch (\Exception $e) {
+            Log::error('Erreur lors de la génération de la réponse avec token : ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return $this->errorResponse('Erreur interne du serveur.', 500);
+        }
+    }
 }
