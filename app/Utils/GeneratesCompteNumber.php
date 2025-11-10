@@ -2,7 +2,6 @@
 
 namespace App\Utils;
 
-use Illuminate\Support\Str;
 use Carbon\Carbon;
 
 trait GeneratesCompteNumber

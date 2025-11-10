@@ -15,15 +15,22 @@ use App\Interfaces\Services\{
     TransactionServiceInterface,
 };
 
+use App\Interfaces\Auth\{
+    AuthInterfaceRepository,
+    AuthInterfaceService,
+};
+
 // Implementations
 use App\Repositories\{
     CompteRepository,
     TransactionRepository,
+    AuthRepository,
 };
 
 use App\Services\{
     CompteService,
     TransactionService,
+    AuthService,
 };
 
 class AppServiceProvider extends ServiceProvider
@@ -37,6 +44,8 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TransactionRepositoryInterface::class, TransactionRepository::class);
         $this->app->bind(CompteServiceInterface::class, CompteService::class);
         $this->app->bind(TransactionServiceInterface::class, TransactionService::class);
+        $this->app->bind(AuthInterfaceRepository::class, AuthRepository::class);
+        $this->app->bind(AuthInterfaceService::class, AuthService::class);
     }
 
     /**
