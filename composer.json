@@ -12,6 +12,7 @@
         "laravel/passport": "*",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
+        "sendgrid/sendgrid": "^8.1",
         "twilio/sdk": "^8.8"
     },
     "require-dev": {
