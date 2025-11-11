@@ -10,11 +10,16 @@ trait ApiResponseTrait
     // Réponse succès générique
     public function successResponse($data, string $message = 'Opération réussie', int $status = 200): JsonResponse
     {
-        return response()->json([
+        $response = [
             'status' => 'success',
             'message' => $message,
-            'data' => $data,
-        ], $status);
+        ];
+
+        if ($data !== null) {
+            $response['data'] = $data;
+        }
+
+        return response()->json($response, $status);
     }
 
     // Réponse erreur générique

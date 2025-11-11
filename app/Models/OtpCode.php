@@ -87,7 +87,7 @@ class OtpCode extends Model
     /**
      * Créer un nouveau code OTP pour un utilisateur
      */
-    public static function createForUser(int $userId, string $phoneNumber, string $type = 'login'): self
+    public static function createForUser(string $userId, string $phoneNumber, string $type = 'login'): self
     {
         // Invalider les anciens codes du même type pour cet utilisateur
         self::where('user_id', $userId)

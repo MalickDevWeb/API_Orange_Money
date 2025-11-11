@@ -17,15 +17,18 @@ class AuthRepository implements AuthInterfaceRepository
     }
 
     public function login(array $credentials): User
-    {
-        $user = User::where('telephone', $credentials['telephone'])->first();
+     {
+         // Vérifier si c'est un email ou un téléphone
+         $field = filter_var($credentials['telephone'], FILTER_VALIDATE_EMAIL) ? 'email' : 'telephone';
 
-        if (!$user || !Hash::check($credentials['password'], $user->password)) {
-            throw new Exception('Invalid credentials');
-        }
+         $user = User::where($field, $credentials['telephone'])->first();
 
-        return $user;
-    }
+         if (!$user) {
+             throw new Exception($field === 'email' ? 'Email non trouvé' : 'Numéro de téléphone non trouvé');
+         }
+
+         return $user;
+     }
 
     public function logout(): void
     {

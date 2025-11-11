@@ -57,6 +57,26 @@ class UserSeeder extends Seeder
             'utilisateur_id' => $client->id,
         ]);
 
+        // Test Client for authentication testing
+        $testClient = User::factory()->create([
+            'id' => (string) Str::uuid(),
+            'nom' => 'malick',
+            'prenom' => 'teuw',
+            'telephone' => '788373031',
+            'email' => 'malickteuw.devweb@gmail.com',
+            'type' => 'client',
+            'password' => Hash::make($password),
+        ]);
+
+        Compte::factory()->create([
+            'id' => (string) Str::uuid(),
+            'numero_compte' => 'CMPT-CLIENT-002',
+            'titulaire' => $testClient->nom . ' ' . $testClient->prenom,
+            'code_marchand' => null,
+            'statut' => 'actif',
+            'utilisateur_id' => $testClient->id,
+        ]);
+
         // Commerçant
         $commercant = User::factory()->commercant()->create([
             'id' => (string) Str::uuid(),
