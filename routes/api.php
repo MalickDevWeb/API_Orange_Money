@@ -30,3 +30,18 @@ Route::middleware('auth:api')->group(function () {
 Route::get('/status', function () {
     return response()->json(['status' => 'API is working']);
 });
+
+// Routes pour les comptes
+Route::middleware('auth:api')->group(function () {
+    Route::apiResource('comptes', \App\Http\Controllers\CompteController::class);
+    Route::post('comptes/{compte}/restore', [\App\Http\Controllers\CompteController::class, 'restore']);
+    Route::delete('comptes/{compte}/force-delete', [\App\Http\Controllers\CompteController::class, 'forceDelete']);
+});
+
+Route::middleware('auth:api')->group(function () {
+    Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class);
+    Route::post('transactions/depot', [\App\Http\Controllers\TransactionController::class, 'depot']);
+    Route::post('transactions/retrait', [\App\Http\Controllers\TransactionController::class, 'retrait']);
+    Route::post('transactions/transfert', [\App\Http\Controllers\TransactionController::class, 'transfert']);
+    Route::post('transactions/paiement', [\App\Http\Controllers\TransactionController::class, 'paiement']);
+});

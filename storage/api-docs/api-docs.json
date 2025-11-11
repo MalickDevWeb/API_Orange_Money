@@ -1,0 +1,643 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "API Orange Money",
+        "description": "API pour le système de mobile money Orange Money",
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8000/api",
+            "description": "Serveur de développement"
+        }
+    ],
+    "paths": {
+        "/register": {
+            "post": {
+                "tags": ["Authentification"],
+                "summary": "Inscription d'un nouvel utilisateur",
+                "operationId": "registerUser",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["nom", "prenom", "telephone", "email", "password", "type"],
+                                "properties": {
+                                    "nom": {"type": "string", "example": "Dupont"},
+                                    "prenom": {"type": "string", "example": "Jean"},
+                                    "telephone": {"type": "string", "example": "770000001"},
+                                    "email": {"type": "string", "format": "email", "example": "jean.dupont@example.com"},
+                                    "password": {"type": "string", "format": "password", "example": "password123"},
+                                    "type": {"type": "string", "enum": ["admin", "client", "commercant"], "example": "client"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Utilisateur créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "user": {"$ref": "#/components/schemas/User"},
+                                        "message": {"type": "string", "example": "Utilisateur enregistré avec succès"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "tags": ["Authentification"],
+                "summary": "Connexion utilisateur",
+                "operationId": "loginUser",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["telephone", "password"],
+                                "properties": {
+                                    "telephone": {"type": "string", "example": "770000001"},
+                                    "password": {"type": "string", "format": "password", "example": "password123"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Connexion réussie",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {"type": "string", "example": "success"},
+                                        "message": {"type": "string", "example": "Connexion réussie"},
+                                        "access_token": {"type": "string"},
+                                        "token_type": {"type": "string", "example": "Bearer"},
+                                        "user": {"$ref": "#/components/schemas/User"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Identifiants invalides"}
+                }
+            }
+        },
+        "/logout": {
+            "post": {
+                "tags": ["Authentification"],
+                "summary": "Déconnexion utilisateur",
+                "operationId": "logoutUser",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Déconnexion réussie",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {"type": "string", "example": "success"},
+                                        "message": {"type": "string", "example": "Déconnexion réussie"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"}
+                }
+            }
+        },
+        "/user": {
+            "get": {
+                "tags": ["Authentification"],
+                "summary": "Récupérer les informations de l'utilisateur connecté",
+                "operationId": "getCurrentUser",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Informations utilisateur récupérées",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {"type": "string", "example": "success"},
+                                        "message": {"type": "string", "example": "Utilisateur récupéré avec succès"},
+                                        "data": {"$ref": "#/components/schemas/User"}
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"}
+                }
+            }
+        },
+        "/comptes": {
+            "get": {
+                "tags": ["Comptes"],
+                "summary": "Lister tous les comptes de l'utilisateur connecté",
+                "operationId": "getComptes",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Liste des comptes récupérée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "status": {"type": "string", "example": "success"},
+                                        "message": {"type": "string", "example": "Comptes récupérés avec succès"},
+                                        "data": {
+                                            "type": "array",
+                                            "items": {"$ref": "#/components/schemas/Compte"}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"}
+                }
+            },
+            "post": {
+                "tags": ["Comptes"],
+                "summary": "Créer un nouveau compte",
+                "operationId": "createCompte",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "numero_compte": {"type": "string", "example": "CMPT-001"},
+                                    "statut": {"type": "string", "enum": ["actif", "inactif", "suspendu"], "example": "actif"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Compte créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Compte"}
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/comptes/{compte}": {
+            "get": {
+                "tags": ["Comptes"],
+                "summary": "Récupérer les détails d'un compte",
+                "operationId": "getCompte",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "compte",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string", "format": "uuid"},
+                        "example": "uuid-compte"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Détails du compte",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Compte"}
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"},
+                    "404": {"description": "Compte non trouvé"}
+                }
+            },
+            "put": {
+                "tags": ["Comptes"],
+                "summary": "Modifier un compte",
+                "operationId": "updateCompte",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "compte",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string", "format": "uuid"}
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "statut": {"type": "string", "enum": ["actif", "inactif", "suspendu"]}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Compte modifié avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "404": {"description": "Compte non trouvé"}
+                }
+            },
+            "delete": {
+                "tags": ["Comptes"],
+                "summary": "Supprimer un compte",
+                "operationId": "deleteCompte",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "compte",
+                        "in": "path",
+                        "required": true,
+                        "schema": {"type": "string", "format": "uuid"}
+                    }
+                ],
+                "responses": {
+                    "200": {"description": "Compte supprimé avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "404": {"description": "Compte non trouvé"}
+                }
+            }
+        },
+        "/transactions": {
+            "get": {
+                "tags": ["Transactions"],
+                "summary": "Lister toutes les transactions",
+                "operationId": "getTransactions",
+                "security": [{"bearerAuth": []}],
+                "responses": {
+                    "200": {
+                        "description": "Liste des transactions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"$ref": "#/components/schemas/Transaction"}
+                                }
+                            }
+                        }
+                    },
+                    "401": {"description": "Non autorisé"}
+                }
+            },
+            "post": {
+                "tags": ["Transactions"],
+                "summary": "Créer une nouvelle transaction",
+                "operationId": "createTransaction",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["type", "montant", "compte_emetteur_id", "compte_recepteur_id"],
+                                "properties": {
+                                    "type": {"type": "string", "enum": ["depot", "retrait", "transfert", "paiement"]},
+                                    "montant": {"type": "number", "format": "float"},
+                                    "compte_emetteur_id": {"type": "string", "format": "uuid"},
+                                    "compte_recepteur_id": {"type": "string", "format": "uuid"},
+                                    "note": {"type": "string"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {"description": "Transaction créée avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/transactions/depot": {
+            "post": {
+                "tags": ["Transactions"],
+                "summary": "Effectuer un dépôt",
+                "operationId": "depotTransaction",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["montant", "compte_recepteur_id"],
+                                "properties": {
+                                    "montant": {"type": "number", "format": "float", "example": 50000},
+                                    "compte_recepteur_id": {"type": "string", "format": "uuid"},
+                                    "note": {"type": "string", "example": "Dépôt d'argent"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Dépôt effectué avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/transactions/retrait": {
+            "post": {
+                "tags": ["Transactions"],
+                "summary": "Effectuer un retrait",
+                "operationId": "retraitTransaction",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["montant", "compte_emetteur_id"],
+                                "properties": {
+                                    "montant": {"type": "number", "format": "float", "example": 25000},
+                                    "compte_emetteur_id": {"type": "string", "format": "uuid"},
+                                    "note": {"type": "string", "example": "Retrait d'argent"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Retrait effectué avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/transactions/transfert": {
+            "post": {
+                "tags": ["Transactions"],
+                "summary": "Effectuer un transfert",
+                "operationId": "transfertTransaction",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["montant", "compte_emetteur_id", "compte_recepteur_id"],
+                                "properties": {
+                                    "montant": {"type": "number", "format": "float", "example": 15000},
+                                    "compte_emetteur_id": {"type": "string", "format": "uuid"},
+                                    "compte_recepteur_id": {"type": "string", "format": "uuid"},
+                                    "note": {"type": "string", "example": "Transfert d'argent"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Transfert effectué avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        },
+        "/transactions/paiement": {
+            "post": {
+                "tags": ["Transactions"],
+                "summary": "Effectuer un paiement",
+                "operationId": "paiementTransaction",
+                "security": [{"bearerAuth": []}],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["montant", "compte_emetteur_id", "compte_recepteur_id"],
+                                "properties": {
+                                    "montant": {"type": "number", "format": "float", "example": 5000},
+                                    "compte_emetteur_id": {"type": "string", "format": "uuid"},
+                                    "compte_recepteur_id": {"type": "string", "format": "uuid"},
+                                    "note": {"type": "string", "example": "Paiement de facture"}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Paiement effectué avec succès"},
+                    "401": {"description": "Non autorisé"},
+                    "422": {"description": "Données invalides"}
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "User": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "uuid-user"
+                    },
+                    "nom": {
+                        "type": "string",
+                        "example": "Dupont"
+                    },
+                    "prenom": {
+                        "type": "string",
+                        "example": "Jean"
+                    },
+                    "telephone": {
+                        "type": "string",
+                        "example": "770000001"
+                    },
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "jean.dupont@example.com"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "admin",
+                            "client",
+                            "commercant"
+                        ],
+                        "example": "client"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Compte": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "uuid-compte"
+                    },
+                    "numero_compte": {
+                        "type": "string",
+                        "example": "CMPT-001"
+                    },
+                    "titulaire": {
+                        "type": "string",
+                        "example": "John Doe"
+                    },
+                    "code_marchand": {
+                        "type": "string",
+                        "example": "MRC001",
+                        "nullable": true
+                    },
+                    "statut": {
+                        "type": "string",
+                        "enum": [
+                            "actif",
+                            "inactif",
+                            "suspendu"
+                        ],
+                        "example": "actif"
+                    },
+                    "utilisateur_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "uuid-user"
+                    },
+                    "solde": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 15000.5
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "Transaction": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "example": "uuid-transaction"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "depot",
+                            "retrait",
+                            "transfert",
+                            "paiement"
+                        ],
+                        "example": "transfert"
+                    },
+                    "montant": {
+                        "type": "number",
+                        "format": "float",
+                        "example": 50000
+                    },
+                    "reference": {
+                        "type": "string",
+                        "example": "TXN-123456"
+                    },
+                    "statut": {
+                        "type": "string",
+                        "enum": [
+                            "reussie",
+                            "echouee",
+                            "annulee"
+                        ],
+                        "example": "reussie"
+                    },
+                    "note": {
+                        "type": "string",
+                        "example": "Paiement de facture",
+                        "nullable": true
+                    },
+                    "compte_emetteur_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "compte_recepteur_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "nullable": true
+                    },
+                    "date_transaction": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            }
+        },
+        "securitySchemes": {
+            "bearerAuth": {
+                "type": "http",
+                "bearerFormat": "JWT",
+                "scheme": "bearer"
+            },
+            "sanctum": {
+                "type": "apiKey",
+                "description": "Enter token in format (Bearer <token>)",
+                "name": "Authorization",
+                "in": "header"
+            }
+        }
+    },
+    "tags": [
+        {"name": "Authentification", "description": "Endpoints pour l'authentification"},
+        {"name": "Comptes", "description": "Gestion des comptes bancaires"},
+        {"name": "Transactions", "description": "Gestion des transactions financières"}
+    ]
+}

@@ -4,9 +4,9 @@ namespace App\Services;
 
 use Exception;
 use App\Models\User;
-use App\DTOs\UserDTO;
 use App\Interfaces\Auth\AuthInterfaceRepository;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Hash;
 
 
 use App\Interfaces\Auth\AuthInterfaceService;
@@ -23,10 +23,11 @@ class AuthService implements AuthInterfaceService
    public function register(array $data): User
    {
        try {
-           $userData = UserDTO::fromArray($data);
-           return $this->authRepo->register($userData);
+           // Hash du mot de passe avant enregistrement
+           $data['password'] = Hash::make($data['password']);
+           return $this->authRepo->register($data);
        } catch (Exception $e) {
-           Log::error('Erreur lors de la création de l’utilisateur : ' . $e->getMessage(), [
+           Log::error('Erreur lors de la création de l\'utilisateur : ' . $e->getMessage(), [
                'trace' => $e->getTraceAsString(),
                'data' => $data,
            ]);

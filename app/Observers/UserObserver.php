@@ -20,7 +20,6 @@ class UserObserver
             'titulaire' => $user->nom . ' ' . $user->prenom,
             'statut' => 'actif',
             'utilisateur_id' => $user->id,
-            'solde' => 0,
         ]);
     }
 
