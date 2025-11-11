@@ -1,0 +1,68 @@
+services:
+  - type: web
+    name: orange-money-api
+    runtime: docker
+    buildCommand: "docker build -t orange-money-api ."
+    startCommand: "docker run -p $PORT:9000 orange-money-api"
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: false
+      - key: APP_URL
+        fromSecret: APP_URL
+      - key: APP_KEY
+        fromSecret: APP_KEY
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_HOST
+        fromSecret: DB_HOST
+      - key: DB_PORT
+        fromSecret: DB_PORT
+      - key: DB_DATABASE
+        fromSecret: DB_DATABASE
+      - key: DB_USERNAME
+        fromSecret: DB_USERNAME
+      - key: DB_PASSWORD
+        fromSecret: DB_PASSWORD
+      - key: REDIS_HOST
+        fromSecret: REDIS_HOST
+      - key: REDIS_PORT
+        fromSecret: REDIS_PORT
+      - key: REDIS_PASSWORD
+        fromSecret: REDIS_PASSWORD
+      - key: BREVO_API_KEY
+        fromSecret: BREVO_API_KEY
+      - key: TWILIO_SID
+        fromSecret: TWILIO_SID
+      - key: TWILIO_TOKEN
+        fromSecret: TWILIO_TOKEN
+      - key: TWILIO_PHONE_NUMBER
+        fromSecret: TWILIO_PHONE_NUMBER
+      - key: JWT_SECRET
+        fromSecret: JWT_SECRET
+      - key: SANCTUM_STATEFUL_DOMAINS
+        fromSecret: SANCTUM_STATEFUL_DOMAINS
+
+  - type: pserv
+    name: orange-money-db
+    runtime: docker
+    dockerfilePath: ./Dockerfile.db
+    envVars:
+      - key: POSTGRES_DB
+        fromSecret: DB_DATABASE
+      - key: POSTGRES_USER
+        fromSecret: DB_USERNAME
+      - key: POSTGRES_PASSWORD
+        fromSecret: DB_PASSWORD
+
+  - type: redis
+    name: orange-money-redis
+    ipAllowList: []  # only accessible by other services
+
+databases:
+  - name: orange-money-db
+    databaseName: orange_money
+    user: orange_money_user
+    plan: starter
