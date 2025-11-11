@@ -23,6 +23,23 @@ class AuthService implements AuthInterfaceService
    public function register(array $data): User
    {
        try {
+           $errors = [];
+
+           // Vérifier l'unicité de l'email
+           if (User::where('email', $data['email'])->exists()) {
+               $errors[] = 'L\'email est déjà utilisé.';
+           }
+
+           // Vérifier l'unicité du téléphone
+           if (User::where('telephone', $data['telephone'])->exists()) {
+               $errors[] = 'Le numéro de téléphone est déjà utilisé.';
+           }
+
+           // Si des erreurs, les combiner
+           if (!empty($errors)) {
+               throw new Exception(implode(' ', $errors));
+           }
+
            // Hash du mot de passe avant enregistrement
            $data['password'] = Hash::make($data['password']);
            return $this->authRepo->register($data);
@@ -36,35 +53,38 @@ class AuthService implements AuthInterfaceService
    }
 
     public function login(array $credentials): array
-    {
-        try {
-            $user = $this->authRepo->login($credentials);
+     {
+         try {
+             $user = $this->authRepo->login($credentials);
 
-            // Générer et envoyer OTP par email
-            $emailOtpService = app(\App\Services\EmailOtpService::class);
-            $emailSent = $emailOtpService->sendOtpEmail($user);
+             // Créer OTP
+             $otp = \App\Models\OtpCode::createForUser(
+                 $user->id,
+                 $user->telephone,
+                 'login'
+             );
 
-            if (!$emailSent) {
-                throw new Exception('Erreur lors de l\'envoi de l\'email OTP');
-            }
+             // Envoyer OTP par SMS
+             $twilioService = app(\App\Services\TwilioService::class);
+             $smsSent = $twilioService->sendOtp('+221' . $user->telephone, $otp->code);
 
-            // Déclencher l'événement UserLoggedIn pour envoyer l'OTP par SMS
-            event(new \App\Events\UserLoggedIn($user));
+             $message = $smsSent ? 'OTP envoyé par SMS' : 'Erreur envoi SMS - vérifiez les logs';
 
-            return [
-                'user' => $user,
-                'email' => $user->email,
-                'phone_number' => $user->telephone,
-                'otp_sent' => true
-            ];
-        } catch (Exception $e) {
-            Log::error('Erreur lors de la connexion de l\'utilisateur : ' . $e->getMessage(), [
-                'trace' => $e->getTraceAsString(),
-                'credentials' => $credentials,
-            ]);
-            throw $e;
-        }
-    }
+             return [
+                 'user' => $user,
+                 'email' => $user->email,
+                 'phone_number' => $user->telephone,
+                 'message' => $message,
+                 'otp_sent' => $smsSent
+             ];
+         } catch (Exception $e) {
+             Log::error('Erreur lors de la connexion de l\'utilisateur : ' . $e->getMessage(), [
+                 'trace' => $e->getTraceAsString(),
+                 'credentials' => $credentials,
+             ]);
+             throw $e;
+         }
+     }
 
     public function verifyOtp(array $data): array
     {
@@ -90,7 +110,8 @@ class AuthService implements AuthInterfaceService
             $otpCode->markAsUsed();
 
             // Générer le token
-            $token = $otpCode->user->createToken('API Token')->plainTextToken;
+            $tokenModel = $otpCode->user->createToken('API Token');
+            $token = $tokenModel->accessToken;
 
             return [
                 'user' => $otpCode->user,

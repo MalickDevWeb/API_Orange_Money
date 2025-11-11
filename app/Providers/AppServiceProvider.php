@@ -20,6 +20,10 @@ use App\Interfaces\Auth\{
     AuthInterfaceService,
 };
 
+use App\Interfaces\Notifications\{
+  TwilioServiceInterface
+};
+
 // Implementations
 use App\Repositories\{
     CompteRepository,
@@ -31,6 +35,7 @@ use App\Services\{
     CompteService,
     TransactionService,
     AuthService,
+    TwilioService
 };
 
 class AppServiceProvider extends ServiceProvider
@@ -46,6 +51,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TransactionServiceInterface::class, TransactionService::class);
         $this->app->bind(AuthInterfaceRepository::class, AuthRepository::class);
         $this->app->bind(AuthInterfaceService::class, AuthService::class);
+        $this->app->bind(TwilioServiceInterface::class, TwilioService::class);
     }
 
     /**

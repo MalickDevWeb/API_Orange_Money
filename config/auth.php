@@ -112,10 +112,10 @@ return [
 
     'password_timeout' => 10800,
 
-    'api'=>[
-      'driver'=> 'passport',
-      'provider'=> 'users',
-      'hash' => false,
-    ]
+    'api' => [
+        'driver' => 'passport',
+        'provider' => 'users',
+        'hash' => false,
+    ],
 
 ];

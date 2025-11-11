@@ -24,37 +24,54 @@ class SendOtpSmsListener
     public function handle(UserLoggedIn $event): void
     {
         try {
-            // Générer un code OTP à 6 chiffres
-            $otpCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-
-            // Stocker l'OTP dans la base de données
-            $event->user->update([
-                'otp_code' => $otpCode,
-                'otp_expires_at' => now()->addMinutes(5), // Expire dans 5 minutes
-                'otp_attempts' => 0,
-                'otp_used' => false,
-            ]);
+            // Créer un code OTP dans la table otp_codes
+            $otp = \App\Models\OtpCode::createForUser(
+                $event->user->id,
+                $event->user->telephone,
+                'login'
+            );
 
             // Envoyer l'OTP par SMS
             $phoneNumber = '+221' . $event->user->telephone; // Format international pour le Sénégal
-            $message = "Votre code de vérification Orange Money est : {$otpCode}. Ce code expire dans 5 minutes.";
+            $smsSent = $this->twilioService->sendOtp($phoneNumber, $otp->code);
 
-            $sent = $this->twilioService->sendSms($phoneNumber, $message);
-
-            if ($sent) {
+            if ($smsSent) {
                 Log::info('OTP envoyé par SMS après connexion', [
                     'user_id' => $event->user->id,
                     'phone' => $phoneNumber,
+                    'otp_id' => $otp->id,
                 ]);
             } else {
                 Log::error('Échec envoi OTP par SMS', [
                     'user_id' => $event->user->id,
                     'phone' => $phoneNumber,
+                    'otp_id' => $otp->id,
                 ]);
             }
 
+            // OTP par email désactivé - seulement SMS
+            /*
+            // Envoyer l'OTP par email
+            $userName = $event->user->nom . ' ' . $event->user->prenom;
+            $emailSent = $this->sendGridService->sendEmailOtp($event->user->email, $otp->code, $userName);
+
+            if ($emailSent) {
+                Log::info('OTP envoyé par email après connexion', [
+                    'user_id' => $event->user->id,
+                    'email' => $event->user->email,
+                    'otp_id' => $otp->id,
+                ]);
+            } else {
+                Log::error('Échec envoi OTP par email', [
+                    'user_id' => $event->user->id,
+                    'email' => $event->user->email,
+                    'otp_id' => $otp->id,
+                ]);
+            }
+            */
+
         } catch (\Exception $e) {
-            Log::error('Erreur lors de l\'envoi de l\'OTP par SMS', [
+            Log::error('Erreur lors de l\'envoi de l\'OTP', [
                 'user_id' => $event->user->id,
                 'error' => $e->getMessage(),
             ]);

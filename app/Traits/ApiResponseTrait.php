@@ -43,17 +43,23 @@ trait ApiResponseTrait
     }
 
     // Réponse création ressource spécifique (UserResource)
-    public function respondCreated($model, string $message = 'Ressource créée avec succès'): JsonResponse
+    public function respondCreated($model, string $message = 'Ressource créée avec succès', $redirectUrl = null): JsonResponse
     {
         try {
             if (!$model) {
                 return $this->errorResponse('Impossible de créer la ressource.', 500);
             }
 
-            return response()->json([
+            $response = [
                 'user' => new \App\Http\Resources\UserResource($model),
                 'message' => $message
-            ], 201);
+            ];
+
+            if ($redirectUrl) {
+                $response['redirect_url'] = $redirectUrl;
+            }
+
+            return response()->json($response, 201);
 
         } catch (\Exception $e) {
             Log::error('Erreur lors de la génération de la réponse JSON : ' . $e->getMessage(), [

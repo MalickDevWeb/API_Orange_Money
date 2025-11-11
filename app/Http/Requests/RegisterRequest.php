@@ -27,8 +27,8 @@ class RegisterRequest extends FormRequest
         return [
             'nom' => 'required|string',
             'prenom' => 'required|string',
-            'telephone' => 'required|unique:users,telephone',
-            'email' => 'required|email|unique:users,email',
+            'telephone' => 'required|string',
+            'email' => 'required|email',
             'password' => 'required|string|min:6',
             'type' => ['required', new Enum(UserType::class)],
         ];
@@ -42,10 +42,8 @@ class RegisterRequest extends FormRequest
             'prenom.required' => MessagesErreursRequests::PRENOM_REQUIRED->value,
             'prenom.string' => MessagesErreursRequests::PRENOM_STRING->value,
             'telephone.required' => MessagesErreursRequests::TELEPHONE_REQUIRED->value,
-            'telephone.unique' => MessagesErreursRequests::TELEPHONE_UNIQUE->value,
             'email.required' => MessagesErreursRequests::EMAIL_REQUIRED->value,
             'email.email' => MessagesErreursRequests::EMAIL_EMAIL->value,
-            'email.unique' => MessagesErreursRequests::EMAIL_UNIQUE->value,
             'password.required' => MessagesErreursRequests::PASSWORD_REQUIRED->value,
             'password.string' => MessagesErreursRequests::PASSWORD_STRING->value,
             'password.min' => MessagesErreursRequests::PASSWORD_MIN->value,

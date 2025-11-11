@@ -5,7 +5,6 @@ namespace App\Http\Controllers;
 use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\VerifyOtpRequest;
-use App\Http\Resources\UserResource;
 use App\Interfaces\Auth\AuthInterfaceService;
 use App\Traits\ApiResponseTrait;
 
@@ -81,7 +80,8 @@ class AuthController extends Controller
     {
         try {
             $user = $this->authService->register($request->validated());
-            return $this->respondCreated($user, 'Utilisateur enregistré avec succès');
+            $redirectUrl = url('/api/login?telephone=' . urlencode($user->telephone));
+            return $this->respondCreated($user, 'Utilisateur enregistré avec succès', $redirectUrl);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -92,7 +92,7 @@ class AuthController extends Controller
      *     path="/api/login",
      *     operationId="loginUser",
      *     tags={"Authentification"},
-     *     summary="Première étape : Vérification du numéro de téléphone et envoi OTP par email",
+     *     summary="Première étape : Vérification du numéro de téléphone et envoi OTP par SMS",
      * @OA\RequestBody(
       *         required=true,
       *         @OA\JsonContent(
@@ -102,17 +102,17 @@ class AuthController extends Controller
       *     ),
      * @OA\Response(
       *         response=200,
-      *         description="Email OTP envoyé, procéder à la vérification",
+      *         description="SMS OTP envoyé, procéder à la vérification",
       *         @OA\JsonContent(
       *             @OA\Property(property="status", type="string", example="success"),
-      *             @OA\Property(property="message", type="string", example="Email de vérification envoyé"),
+      *             @OA\Property(property="message", type="string", example="SMS de vérification envoyé"),
       *             @OA\Property(property="requires_otp", type="boolean", example=true),
       *             @OA\Property(property="email", type="string", example="user@example.com"),
       *             @OA\Property(property="phone_number", type="string", example="770000001")
       *         )
       *     ),
      *     @OA\Response(response=401, description="Numéro de téléphone non trouvé"),
-     *     @OA\Response(response=500, description="Erreur d'envoi d'email")
+     *     @OA\Response(response=500, description="Erreur d'envoi d'SMS")
      * )
      */
     public function login(LoginRequest $request)
@@ -123,9 +123,10 @@ class AuthController extends Controller
                 [
                     'requires_otp' => true,
                     'email' => $result['email'],
-                    'phone_number' => $result['user']->telephone
+                    'phone_number' => $result['phone_number'],
+                    'otp_sent' => $result['otp_sent'] ?? false
                 ],
-                'Email de vérification envoyé'
+                $result['message']
             );
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -203,72 +204,6 @@ class AuthController extends Controller
         }
     }
 
-    /**
-     * @OA\Get(
-     *     path="/api/auth/verify/{userId}/{token}",
-     *     operationId="verifyOtpLink",
-     *     tags={"Authentification"},
-     *     summary="Vérification OTP via lien email (auto-submit)",
-     *     @OA\Parameter(
-     *         name="userId",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string"),
-     *         description="ID de l'utilisateur"
-     *     ),
-     *     @OA\Parameter(
-     *         name="token",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string"),
-     *         description="Token de vérification sécurisé"
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="OTP vérifié, redirection avec token",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Connexion réussie"),
-     *             @OA\Property(property="access_token", type="string"),
-     *             @OA\Property(property="token_type", type="string", example="Bearer"),
-     *             @OA\Property(property="user", ref="#/components/schemas/User")
-     *         )
-     *     ),
-     *     @OA\Response(response=400, description="Lien invalide ou expiré"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
-    public function verifyOtpLink(string $userId, string $token)
-    {
-        try {
-            $emailOtpService = app(\App\Services\EmailOtpService::class);
-            $user = $emailOtpService->verifyOtpFromLink($token, $userId);
-
-            if (!$user) {
-                return response()->json([
-                    'status' => 'error',
-                    'message' => 'Lien de vérification invalide ou expiré'
-                ], 400);
-            }
-
-            // Générer le token JWT
-            $jwtToken = $user->createToken('API Token')->plainTextToken;
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Connexion réussie via email',
-                'access_token' => $jwtToken,
-                'token_type' => 'Bearer',
-                'user' => new \App\Http\Resources\UserAuthResource($user)
-            ], 200);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Erreur lors de la vérification du lien'
-            ], 500);
-        }
-    }
 
     /**
      * @OA\Get(
@@ -300,3 +235,4 @@ class AuthController extends Controller
     }
 
 }
+

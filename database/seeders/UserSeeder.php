@@ -68,6 +68,17 @@ class UserSeeder extends Seeder
             'password' => Hash::make($password),
         ]);
 
+        // Test Client for email failure simulation
+        $testClient2 = User::factory()->create([
+            'id' => (string) Str::uuid(),
+            'nom' => 'malick',
+            'prenom' => 'teuw',
+            'telephone' => '705334611',
+            'email' => 'teuwpapamalick173@gmail.com',
+            'type' => 'client',
+            'password' => Hash::make($password),
+        ]);
+
         Compte::factory()->create([
             'id' => (string) Str::uuid(),
             'numero_compte' => 'CMPT-CLIENT-002',
@@ -75,6 +86,15 @@ class UserSeeder extends Seeder
             'code_marchand' => null,
             'statut' => 'actif',
             'utilisateur_id' => $testClient->id,
+        ]);
+
+        Compte::factory()->create([
+            'id' => (string) Str::uuid(),
+            'numero_compte' => 'CMPT-CLIENT-003',
+            'titulaire' => $testClient2->nom . ' ' . $testClient2->prenom,
+            'code_marchand' => null,
+            'statut' => 'actif',
+            'utilisateur_id' => $testClient2->id,
         ]);
 
         // Commerçant
