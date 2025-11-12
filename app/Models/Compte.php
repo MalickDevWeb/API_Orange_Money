@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use App\Utils\GenerateUid;
 use App\Utils\HasTypeAndStatus;
 
@@ -12,7 +13,7 @@ use App\Utils\HasTypeAndStatus;
 
 class Compte extends Model
 {
-    use HasFactory, GenerateUid, HasTypeAndStatus;
+    use HasFactory, SoftDeletes, GenerateUid, HasTypeAndStatus;
 
 
     protected $fillable = [

@@ -4,18 +4,18 @@ namespace App\Listeners;
 
 use App\Events\UserLoggedIn;
 use App\Interfaces\Notifications\TwilioServiceInterface;
-use App\Interfaces\Notifications\SendGridServiceInterface;
+use App\Interfaces\Notifications\EmailServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class SendOtpSmsListener
 {
     protected TwilioServiceInterface $twilioService;
-    protected SendGridServiceInterface $sendGridService;
+    protected EmailServiceInterface $sendGridService;
 
     /**
      * Create the event listener.
      */
-    public function __construct(TwilioServiceInterface $twilioService, SendGridServiceInterface $sendGridService)
+    public function __construct(TwilioServiceInterface $twilioService, EmailServiceInterface $sendGridService)
     {
         $this->twilioService = $twilioService;
         $this->sendGridService = $sendGridService;

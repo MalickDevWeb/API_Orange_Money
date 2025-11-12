@@ -6,6 +6,7 @@ use App\Models\Transaction;
 use App\Models\Compte;
 use App\Services\TransactionService;
 use App\Traits\ApiResponseTrait;
+use App\Traits\PaginatedSortedTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -52,13 +53,18 @@ use Illuminate\Support\Facades\DB;
  */
 class TransactionController extends Controller
 {
-    use ApiResponseTrait;
+    use ApiResponseTrait, PaginatedSortedTrait;
 
     protected TransactionService $transactionService;
 
     public function __construct(TransactionService $transactionService)
     {
         $this->transactionService = $transactionService;
+    }
+
+    protected function getAllowedSortFields()
+    {
+        return ['created_at', 'updated_at', 'montant', 'type', 'statut', 'date_transaction'];
     }
 
     /**
@@ -77,10 +83,21 @@ class TransactionController extends Controller
      *     )
      * )
      */
-    public function index()
+    public function index(Request $request)
     {
         try {
-            $transactions = $this->transactionService->getAll();
+            $query = Transaction::query();
+
+            if (!auth()->user()->isAdmin()) {
+                // Filter by user's comptes
+                $userComptes = auth()->user()->comptes->pluck('id');
+                $query->where(function($q) use ($userComptes) {
+                    $q->whereIn('compte_emetteur_id', $userComptes)
+                      ->orWhereIn('compte_recepteur_id', $userComptes);
+                });
+            }
+
+            $transactions = $this->getPaginatedSorted($query, $request);
             return $this->successResponse($transactions, 'Transactions récupérées avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -155,12 +172,12 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Transaction trouvée",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=404, description="Transaction non trouvée")
-     * )
-     */
+         description="Transaction trouvée",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     ),
+     @OA\Response(response=404, description="Transaction non trouvée")
+ )
+ */
     public function show(Transaction $transaction)
     {
         try {
@@ -191,11 +208,11 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Transaction mise à jour",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     )
-     * )
-     */
+         description="Transaction mise à jour",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     )
+ )
+ */
     public function update(Request $request, Transaction $transaction)
     {
         try {
@@ -230,13 +247,13 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-     *         description="Transaction supprimée",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Transaction supprimée avec succès")
-     *         )
-     *     )
-     * )
-     */
+         description="Transaction supprimée",
+         @OA\JsonContent(
+             @OA\Property(property="message", type="string", example="Transaction supprimée avec succès")
+         )
+     )
+ )
+ */
     public function destroy(Transaction $transaction)
     {
         try {
@@ -268,11 +285,11 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=201,
-     *         description="Dépôt effectué avec succès",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     )
-     * )
-     */
+         description="Dépôt effectué avec succès",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     )
+ )
+ */
     public function depot(Request $request)
     {
         try {
@@ -308,17 +325,17 @@ class TransactionController extends Controller
      *             required={"montant","compte_emetteur_id"},
      *             @OA\Property(property="montant", type="number", format="float", example=25000),
      *             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte"),
-     *             @OA\Property(property="note", type="string", example="Retrait d'argent")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Retrait effectué avec succès",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=400, description="Solde insuffisant")
-     * )
-     */
+             @OA\Property(property="note", type="string", example="Retrait d'argent")
+         )
+     ),
+     @OA\Response(
+         response=201,
+         description="Retrait effectué avec succès",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     ),
+     @OA\Response(response=400, description="Solde insuffisant")
+ )
+ */
     public function retrait(Request $request)
     {
         try {
@@ -359,19 +376,19 @@ class TransactionController extends Controller
      *         @OA\JsonContent(
      *             required={"montant","compte_emetteur_id","compte_recepteur_id"},
      *             @OA\Property(property="montant", type="number", format="float", example=30000),
-     *             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-emetteur"),
-     *             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-recepteur"),
-     *             @OA\Property(property="note", type="string", example="Transfert d'argent")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Transfert effectué avec succès",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=400, description="Solde insuffisant")
-     * )
-     */
+             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-emetteur"),
+             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-recepteur"),
+             @OA\Property(property="note", type="string", example="Transfert d'argent")
+         )
+     ),
+     @OA\Response(
+         response=201,
+         description="Transfert effectué avec succès",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     ),
+     @OA\Response(response=400, description="Solde insuffisant")
+ )
+ */
     public function transfert(Request $request)
     {
         try {
@@ -410,20 +427,20 @@ class TransactionController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"montant","compte_emetteur_id","compte_recepteur_id"},
-     *             @OA\Property(property="montant", type="number", format="float", example=15000),
-     *             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-client"),
-     *             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-commercant"),
-     *             @OA\Property(property="note", type="string", example="Paiement de produit")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Paiement effectué avec succès",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=400, description="Solde insuffisant")
-     * )
-     */
+             @OA\Property(property="montant", type="number", format="float", example=15000),
+             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-client"),
+             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-commercant"),
+             @OA\Property(property="note", type="string", example="Paiement de produit")
+         )
+     ),
+     @OA\Response(
+         response=201,
+         description="Paiement effectué avec succès",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     ),
+     @OA\Response(response=400, description="Solde insuffisant")
+ )
+ */
     public function paiement(Request $request)
     {
         try {
@@ -447,6 +464,67 @@ class TransactionController extends Controller
 
             $transaction = $this->transactionService->create($data);
             return $this->respondCreated($transaction, 'Paiement effectué avec succès');
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage());
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/api/transactions/achat-virtuel",
+     *     tags={"Transactions"},
+     *     summary="Achat d'argent virtuel par l'admin",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"montant"},
+             @OA\Property(property="montant", type="number", format="float", example=50000),
+             @OA\Property(property="note", type="string", example="Achat d'argent virtuel")
+         )
+     ),
+     @OA\Response(
+         response=201,
+         description="Achat virtuel effectué avec succès",
+         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     ),
+     @OA\Response(response=403, description="Accès réservé aux admins")
+ )
+ */
+    public function achatVirtuel(Request $request)
+    {
+        try {
+            // Vérifier que l'utilisateur est admin
+            $adminUser = auth()->user();
+            if (!$adminUser->isAdmin()) {
+                return $this->errorResponse('Accès réservé aux administrateurs', 403);
+            }
+
+            $data = $request->validate([
+                'montant' => 'required|numeric|min:0.01',
+                'note' => 'nullable|string',
+            ]);
+
+            // Trouver le compte admin
+            $compteAdmin = $adminUser->comptes->first();
+            if (!$compteAdmin) {
+                return $this->errorResponse('Aucun compte trouvé pour l\'administrateur', 404);
+            }
+
+            // Créer la transaction d'achat virtuel (enregistrement)
+            $transactionData = [
+                'type' => 'achat_virtuel',
+                'montant' => $data['montant'],
+                'reference' => 'ACHAT-' . strtoupper(uniqid()),
+                'note' => $data['note'] ?? 'Achat d\'argent virtuel',
+                'compte_emetteur_id' => null, // Système
+                'compte_recepteur_id' => $compteAdmin->id,
+                'statut' => 'reussie',
+                'date_transaction' => now(),
+            ];
+
+            $transaction = $this->transactionService->create($transactionData);
+            return $this->successResponse($transaction, 'Achat virtuel effectué avec succès', 201);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }

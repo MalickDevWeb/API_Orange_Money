@@ -3,11 +3,10 @@
 namespace App\Services;
 
 use App\Interfaces\Notifications\EmailServiceInterface;
-use SendGrid;
-use SendGrid\Mail\Mail;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
-class SendGridService implements EmailServiceInterface
+class MailtrapService implements EmailServiceInterface
 {
     /**
      * Envoyer un email simple
@@ -15,31 +14,40 @@ class SendGridService implements EmailServiceInterface
     public function sendEmail(string $to, string $subject, string $content): bool
     {
         try {
-            $email = new Mail();
-            $email->setFrom(config('mail.from.address'), config('mail.from.name'));
-            $email->setSubject($subject);
-            $email->addTo($to);
-            $email->addContent("text/html", $content);
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('MAILTRAP_API_TOKEN'),
+                'Content-Type' => 'application/json',
+            ])->post('https://send.api.mailtrap.io/api/send', [
+                'to' => [
+                    ['email' => $to]
+                ],
+                'from' => [
+                    'email' => config('mail.from.address'),
+                    'name' => config('mail.from.name')
+                ],
+                'subject' => $subject,
+                'html' => $content,
+            ]);
 
-            $sendgrid = new SendGrid(config('services.sendgrid.api_key'));
-            $response = $sendgrid->send($email);
-
-            if ($response->statusCode() == 202) {
-                Log::info('Email envoyé via SendGrid API', [
+            if ($response->successful()) {
+                Log::info('Email envoyé via Mailtrap API', [
                     'to' => $to,
                     'subject' => $subject,
+                    'response' => $response->json(),
                 ]);
+
                 return true;
             } else {
-                Log::error('Erreur envoi email SendGrid API', [
+                Log::error('Erreur envoi email Mailtrap API', [
                     'to' => $to,
-                    'status' => $response->statusCode(),
+                    'status' => $response->status(),
                     'body' => $response->body(),
                 ]);
+
                 return false;
             }
         } catch (\Exception $e) {
-            Log::error('Erreur envoi email SendGrid API', [
+            Log::error('Erreur envoi email Mailtrap API', [
                 'to' => $to,
                 'error' => $e->getMessage(),
             ]);
@@ -66,7 +74,7 @@ class SendGridService implements EmailServiceInterface
         $htmlContent = "
         <h1>Bonjour {$userName}</h1>
         <p>Votre code de vérification Orange Money est : <strong>{$otpCode}</strong></p>
-        <p>Ce code expire dans 5 minutes.</p>
+        <p>Ce code expire dans 30 minutes.</p>
         <p>Cordialement,<br>L'équipe Orange Money</p>
         ";
 

@@ -13,9 +13,14 @@ class CompteObserver
      */
     public function creating(Compte $compte): void
     {
-        $qrCode = new QrCode($compte->numero_compte);
-        $writer = new PngWriter();
-        $result = $writer->write($qrCode);
-        $compte->qr_code = base64_encode($result->getString());
+        try {
+            $qrCode = new QrCode($compte->numero_compte);
+            $writer = new PngWriter();
+            $result = $writer->write($qrCode);
+            $compte->qr_code = base64_encode($result->getString());
+        } catch (\Exception $e) {
+            // Si GD n'est pas disponible, laisser qr_code null
+            $compte->qr_code = null;
+        }
     }
 }

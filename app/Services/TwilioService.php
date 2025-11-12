@@ -8,16 +8,21 @@ use Illuminate\Support\Facades\Log;
 
 class TwilioService implements TwilioServiceInterface
 {
-    protected Client $client;
-    protected string $fromNumber;
+    protected ?Client $client;
+    protected ?string $fromNumber;
 
     public function __construct()
     {
-        $this->client = new Client(
-            config('services.twilio.sid'),
-            config('services.twilio.token')
-        );
-        $this->fromNumber = config('services.twilio.from');
+        $sid = config('services.twilio.sid');
+        $token = config('services.twilio.token');
+
+        if ($sid && $token) {
+            $this->client = new Client($sid, $token);
+            $this->fromNumber = config('services.twilio.from');
+        } else {
+            $this->client = null;
+            $this->fromNumber = null;
+        }
     }
 
     /**
@@ -25,6 +30,14 @@ class TwilioService implements TwilioServiceInterface
      */
     public function sendSms(string $to, string $message): bool
     {
+        if (!$this->client || !$this->fromNumber) {
+            Log::warning('Twilio non configuré - SMS ignoré', [
+                'to' => $to,
+                'message' => $message
+            ]);
+            return false;
+        }
+
         try {
             $this->client->messages->create($to, [
                 'from' => $this->fromNumber,

@@ -20,7 +20,7 @@ trait HasTypeAndStatus
             $name = strtolower(substr($method, 2));
 
             // Vérifie si c’est un status existant
-            if (isset($this->statut) && in_array($name, ['actif','inactif','suspendu','reussie','echouee'])) {
+            if (isset($this->statut) && in_array($name, ['actif','inactif','suspendu','en_attente','reussie','echouee'])) {
                 return $this->hasStatus($name);
             }
 

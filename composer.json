@@ -9,7 +9,7 @@
         "darkaonline/l5-swagger": "^8.6",
         "endroid/qr-code": "^6.0",
         "getbrevo/brevo-php": "^2.0",
-        "guzzlehttp/guzzle": "^7.2",
+        "guzzlehttp/guzzle": "^7.10",
         "laravel/framework": "^10.10",
         "laravel/passport": "*",
         "laravel/sanctum": "^3.3",

@@ -92,7 +92,7 @@ return [
             /*
              * Edit to set the api's base path
              */
-            'base' => env('L5_SWAGGER_BASE_PATH', null),
+            'base' => env('L5_SWAGGER_BASE_PATH', '/api'),
 
             /*
              * Absolute path to directories that should be excluded from scanning
@@ -305,6 +305,16 @@ return [
          */
         'constants' => [
             'L5_SWAGGER_CONST_HOST' => env('L5_SWAGGER_CONST_HOST', 'http://my-default-host.com'),
+        ],
+
+        /*
+         * Servers for OpenAPI spec
+         */
+        'servers' => [
+            [
+                'url' => env('APP_URL'),
+                'description' => 'API Server',
+            ],
         ],
     ],
 ];

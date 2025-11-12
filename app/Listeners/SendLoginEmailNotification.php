@@ -3,14 +3,14 @@
 namespace App\Listeners;
 
 use App\Events\UserLoggedIn;
-use App\Interfaces\Notifications\SendGridServiceInterface;
+use App\Interfaces\Notifications\EmailServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class SendLoginEmailNotification
 {
-    protected SendGridServiceInterface $sendGridService;
+    protected EmailServiceInterface $sendGridService;
 
-    public function __construct(SendGridServiceInterface $sendGridService)
+    public function __construct(EmailServiceInterface $sendGridService)
     {
         $this->sendGridService = $sendGridService;
     }

@@ -22,7 +22,7 @@ use App\Traits\ApiResponseTrait;
  *     @OA\Property(property="prenom", type="string", example="Jean"),
  *     @OA\Property(property="telephone", type="string", example="705334611"),
  *     @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
- *     @OA\Property(property="type", type="string", enum={"admin","client","commercant"}, example="client"),
+ *     @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
@@ -62,7 +62,7 @@ class AuthController extends Controller
      *             @OA\Property(property="telephone", type="string", example="705334611"),
      *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
      *             @OA\Property(property="password", type="string", format="password", example="password123"),
-     *             @OA\Property(property="type", type="string", enum={"admin","client","commercant"}, example="client")
+     *             @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client")
      *         )
      *     ),
      *     @OA\Response(
@@ -155,11 +155,33 @@ class AuthController extends Controller
      *     @OA\Response(response=401, description="Non autorisé")
      * )
      */
-    public function logout()
+    public function sendLogoutOtp()
     {
         try {
-            $this->authService->logout();
-            return $this->successResponse('Déconnexion réussie');
+            $result = $this->authService->sendLogoutOtp();
+            $responseData = [
+                'otp_sent' => $result['otp_sent'] ?? false
+            ];
+
+            // Include OTP code in development
+            if (isset($result['otp_code'])) {
+                $responseData['otp_code'] = $result['otp_code'];
+            }
+
+            return $this->successResponse($responseData, $result['message']);
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage());
+        }
+    }
+
+    public function verifyLogoutOtp(\Illuminate\Http\Request $request)
+    {
+        try {
+            $data = $request->validate([
+                'otp_code' => 'required|string|size:6',
+            ]);
+            $result = $this->authService->verifyLogoutOtp($data);
+            return $this->successResponse($result['message']);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -232,7 +254,13 @@ class AuthController extends Controller
     {
         try {
             $user = $this->authService->user();
-            return $this->successResponse('Utilisateur récupéré avec succès', $user);
+            $userData = [
+                'nom' => $user->nom,
+                'prenom' => $user->prenom,
+                'telephone' => $user->telephone,
+                'email' => $user->email,
+            ];
+            return $this->successResponse($userData, 'Utilisateur récupéré avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }

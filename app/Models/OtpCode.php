@@ -18,12 +18,14 @@ class OtpCode extends Model
         'used_at',
         'attempts',
         'type', // 'registration', 'login', 'transaction', etc.
+        'data',
     ];
 
     protected $casts = [
         'expires_at' => 'datetime',
         'used_at' => 'datetime',
         'attempts' => 'integer',
+        'data' => 'array',
     ];
 
     /**
@@ -86,8 +88,13 @@ class OtpCode extends Model
 
     /**
      * Créer un nouveau code OTP pour un utilisateur
+     *
+     * @param string $userId
+     * @param string $phoneNumber
+     * @param string $type
+     * @param array $data
      */
-    public static function createForUser(string $userId, string $phoneNumber, string $type = 'login'): self
+    public static function createForUser(string $userId, string $phoneNumber, string $type = 'login', array $data = []): self
     {
         // Invalider les anciens codes du même type pour cet utilisateur
         self::where('user_id', $userId)
@@ -102,11 +109,16 @@ class OtpCode extends Model
             'expires_at' => now()->addMinutes(30), // Expire dans 30 minutes
             'type' => $type,
             'attempts' => 0,
+            'data' => $data,
         ]);
     }
 
     /**
      * Trouver un code OTP valide
+     *
+     * @param string $code
+     * @param string $phoneNumber
+     * @param string $type
      */
     public static function findValidCode(string $code, string $phoneNumber, string $type = 'login'): ?self
     {

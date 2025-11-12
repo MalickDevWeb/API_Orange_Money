@@ -77,7 +77,7 @@ trait ApiResponseTrait
             $response = [
                 'status' => 'success',
                 'message' => $message,
-                'access_token' => $token,
+                'access_token' => $token->plainTextToken,
                 'token_type' => 'Bearer',
             ];
 

@@ -2,13 +2,13 @@
 
 namespace App\Services;
 
-use App\Interfaces\Notifications\SendGridServiceInterface;
+use App\Interfaces\Notifications\EmailServiceInterface;
 use Brevo\Client\Api\TransactionalEmailsApi;
 use Brevo\Client\Model\SendSmtpEmail;
 use Brevo\Client\Configuration;
 use Illuminate\Support\Facades\Log;
 
-class BrevoService implements SendGridServiceInterface
+class BrevoService implements EmailServiceInterface
 {
     /**
      * Envoyer un email simple

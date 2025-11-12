@@ -9,6 +9,9 @@
         {
             "url": "http://localhost:8000/api",
             "description": "Serveur de développement"
+        },
+        {
+            "url": "/api"
         }
     ],
     "paths": {
@@ -60,7 +63,8 @@
                                         "enum": [
                                             "admin",
                                             "client",
-                                            "commercant"
+                                            "commercant",
+                                            "fournisseur"
                                         ],
                                         "example": "client"
                                     }
@@ -990,6 +994,413 @@
                 ]
             }
         },
+        "/api/admin/users/pending": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Récupérer les utilisateurs en attente d'approbation",
+                "operationId": "getPendingUsers",
+                "responses": {
+                    "200": {
+                        "description": "Liste des utilisateurs en attente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/User"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/users/{id}/approve": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Approuver un utilisateur",
+                "operationId": "approveUser",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur approuvé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Utilisateur approuvé avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/users/{id}/reject": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Rejeter un utilisateur",
+                "operationId": "rejectUser",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "motif_rejet": {
+                                        "type": "string",
+                                        "example": "Documents insuffisants"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur rejeté",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Utilisateur rejeté"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/balance-requests/pending": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Récupérer les demandes de solde en attente",
+                "operationId": "getPendingBalanceRequests",
+                "responses": {
+                    "200": {
+                        "description": "Liste des demandes en attente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "id": {
+                                                        "type": "string"
+                                                    },
+                                                    "supplier": {
+                                                        "$ref": "#/components/schemas/User"
+                                                    },
+                                                    "montant": {
+                                                        "type": "number"
+                                                    },
+                                                    "statut": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/balance-requests/{id}/approve": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Approuver une demande de solde",
+                "operationId": "approveBalanceRequest",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Demande approuvée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Demande de solde approuvée"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Demande non trouvée"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/balance-requests/{id}/reject": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Rejeter une demande de solde",
+                "operationId": "rejectBalanceRequest",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "motif_rejet": {
+                                        "type": "string",
+                                        "example": "Montant trop élevé"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Demande rejetée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Demande de solde rejetée"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Demande non trouvée"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/deposit": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Effectuer un dépôt sur le compte d'un client par numéro de téléphone",
+                "operationId": "adminDeposit",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "telephone",
+                                    "montant"
+                                ],
+                                "properties": {
+                                    "telephone": {
+                                        "type": "string",
+                                        "example": "705334611"
+                                    },
+                                    "montant": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 50000
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "Dépôt client"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Dépôt effectué avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Dépôt effectué avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Client non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/login/otp": {
             "post": {
                 "tags": [
@@ -1059,6 +1470,90 @@
                         "description": "Trop de tentatives"
                     }
                 }
+            }
+        },
+        "/api/comptes/me": {
+            "get": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Afficher les comptes de l'utilisateur connecté",
+                "operationId": "GET::/api/comptes/me::App\\Http\\Controllers\\CompteController::me",
+                "parameters": [
+                    {
+                        "name": "all",
+                        "in": "query",
+                        "description": "Inclure tous les comptes (par défaut seulement actifs)",
+                        "required": false,
+                        "schema": {
+                            "type": "boolean"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Comptes récupérés avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Votre compte actif récupéré avec succès"
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "numero_compte": {
+                                                        "type": "string",
+                                                        "example": "CMPT-001"
+                                                    },
+                                                    "titulaire": {
+                                                        "type": "string",
+                                                        "example": "John Doe"
+                                                    },
+                                                    "solde": {
+                                                        "type": "number",
+                                                        "format": "float",
+                                                        "example": 15000.5
+                                                    },
+                                                    "statut": {
+                                                        "type": "string",
+                                                        "example": "actif"
+                                                    },
+                                                    "code_marchand": {
+                                                        "type": "string",
+                                                        "example": "MRC001",
+                                                        "nullable": true
+                                                    },
+                                                    "qr_code": {
+                                                        "type": "string",
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
         "/api/comptes/{compte}/restore": {
@@ -1140,6 +1635,118 @@
                     }
                 ]
             }
+        },
+        "/api/transactions/achat-virtuel": {
+            "post": {
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Achat d'argent virtuel par l'admin",
+                "operationId": "POST::/api/transactions/achat-virtuel::App\\Http\\Controllers\\TransactionController::achatVirtuel",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "montant"
+                                ],
+                                "properties": {
+                                    "montant": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 50000
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "Achat d'argent virtuel"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Achat virtuel effectué avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Transaction"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès réservé aux admins"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/suppliers/balance-request": {
+            "post": {
+                "tags": [
+                    "Fournisseurs"
+                ],
+                "summary": "Demander l'achat de solde (fournisseur)",
+                "operationId": "requestBalance",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "montant"
+                                ],
+                                "properties": {
+                                    "montant": {
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 100000
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Demande créée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Demande de solde créée avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès réservé aux fournisseurs approuvés"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
@@ -1173,7 +1780,8 @@
                         "enum": [
                             "admin",
                             "client",
-                            "commercant"
+                            "commercant",
+                            "fournisseur"
                         ],
                         "example": "client"
                     },
@@ -1320,6 +1928,10 @@
     },
     "tags": [
         {
+            "name": "Administration",
+            "description": "Endpoints pour l'administration des utilisateurs"
+        },
+        {
             "name": "Authentification",
             "description": "Endpoints pour l'authentification des utilisateurs"
         },
@@ -1330,6 +1942,10 @@
         {
             "name": "Transactions",
             "description": "Gestion des transactions financières"
+        },
+        {
+            "name": "Fournisseurs",
+            "description": "Fournisseurs"
         }
     ]
 }
