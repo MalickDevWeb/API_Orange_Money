@@ -45,6 +45,7 @@ return [
                  */
                 'annotations' => [
                     base_path('app'),
+                    base_path('routes'),
                 ],
             ],
         ],
@@ -109,11 +110,6 @@ return [
              */
             'default_processors_configuration' => [
                 'operationId.hash' => false,
-                'pathFilter' => [
-                    'tags' => [
-                        '/api/',
-                    ],
-                ],
             ],
 
             /**

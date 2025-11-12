@@ -24,4 +24,14 @@ interface SendGridServiceInterface
      * @return bool
      */
     public function sendEmailWithAttachment(string $to, string $subject, string $content, ?string $attachmentPath = null): bool;
+
+    /**
+     * Envoyer un email OTP
+     *
+     * @param string $to        Adresse email du destinataire
+     * @param string $otpCode   Code OTP
+     * @param string $userName  Nom de l'utilisateur
+     * @return bool             True si succès, False sinon
+     */
+    public function sendEmailOtp(string $to, string $otpCode, string $userName): bool;
 }

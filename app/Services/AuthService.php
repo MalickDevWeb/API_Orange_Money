@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Interfaces\Auth\AuthInterfaceRepository;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use App\Events\UserLoggedIn;
 
 
 use App\Interfaces\Auth\AuthInterfaceService;
@@ -64,19 +65,32 @@ class AuthService implements AuthInterfaceService
                  'login'
              );
 
-             // Envoyer OTP par SMS
+             // Envoyer OTP par SMS (principal)
              $twilioService = app(\App\Services\TwilioService::class);
              $smsSent = $twilioService->sendOtp('+221' . $user->telephone, $otp->code);
 
-             $message = $smsSent ? 'OTP envoyé par SMS' : 'Erreur envoi SMS - vérifiez les logs';
+             $emailSent = false;
+             if (!$smsSent) {
+                 // Fallback to email if SMS fails
+                 $brevoService = app(\App\Interfaces\Notifications\SendGridServiceInterface::class);
+                 $userName = $user->nom . ' ' . $user->prenom;
+                 $emailSent = $brevoService->sendEmailOtp($user->email, $otp->code, $userName);
+             }
 
-             return [
+             $otpSent = $smsSent || $emailSent;
+             $message = $otpSent ? 'OTP envoyé' : 'Erreur envoi OTP - vérifiez les logs';
+
+             $response = [
                  'user' => $user,
                  'email' => $user->email,
                  'phone_number' => $user->telephone,
                  'message' => $message,
-                 'otp_sent' => $smsSent
+                 'otp_sent' => $otpSent
              ];
+
+             // OTP code sent only via email/SMS, not included in response for security
+
+             return $response;
          } catch (Exception $e) {
              Log::error('Erreur lors de la connexion de l\'utilisateur : ' . $e->getMessage(), [
                  'trace' => $e->getTraceAsString(),
@@ -112,6 +126,9 @@ class AuthService implements AuthInterfaceService
             // Générer le token
             $tokenModel = $otpCode->user->createToken('API Token');
             $token = $tokenModel->accessToken;
+
+            // Fire the event after successful login
+            event(new UserLoggedIn($otpCode->user));
 
             return [
                 'user' => $otpCode->user,

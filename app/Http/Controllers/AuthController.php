@@ -20,7 +20,7 @@ use App\Traits\ApiResponseTrait;
  *     @OA\Property(property="id", type="string", format="uuid", example="uuid-user"),
  *     @OA\Property(property="nom", type="string", example="Dupont"),
  *     @OA\Property(property="prenom", type="string", example="Jean"),
- *     @OA\Property(property="telephone", type="string", example="770000001"),
+ *     @OA\Property(property="telephone", type="string", example="705334611"),
  *     @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
  *     @OA\Property(property="type", type="string", enum={"admin","client","commercant"}, example="client"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
@@ -59,7 +59,7 @@ class AuthController extends Controller
      *             required={"nom","prenom","telephone","email","password","type"},
      *             @OA\Property(property="nom", type="string", example="Dupont"),
      *             @OA\Property(property="prenom", type="string", example="Jean"),
-     *             @OA\Property(property="telephone", type="string", example="770000001"),
+     *             @OA\Property(property="telephone", type="string", example="705334611"),
      *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
      *             @OA\Property(property="password", type="string", format="password", example="password123"),
      *             @OA\Property(property="type", type="string", enum={"admin","client","commercant"}, example="client")
@@ -97,7 +97,7 @@ class AuthController extends Controller
       *         required=true,
       *         @OA\JsonContent(
       *             required={"telephone"},
-      *             @OA\Property(property="telephone", type="string", example="770000001", description="Numéro de téléphone ou email")
+      *             @OA\Property(property="telephone", type="string", example="705334611", description="Numéro de téléphone ou email")
       *         )
       *     ),
      * @OA\Response(
@@ -108,7 +108,7 @@ class AuthController extends Controller
       *             @OA\Property(property="message", type="string", example="SMS de vérification envoyé"),
       *             @OA\Property(property="requires_otp", type="boolean", example=true),
       *             @OA\Property(property="email", type="string", example="user@example.com"),
-      *             @OA\Property(property="phone_number", type="string", example="770000001")
+      *             @OA\Property(property="phone_number", type="string", example="705334611")
       *         )
       *     ),
      *     @OA\Response(response=401, description="Numéro de téléphone non trouvé"),
@@ -119,15 +119,19 @@ class AuthController extends Controller
     {
         try {
             $result = $this->authService->login($request->validated());
-            return $this->successResponse(
-                [
-                    'requires_otp' => true,
-                    'email' => $result['email'],
-                    'phone_number' => $result['phone_number'],
-                    'otp_sent' => $result['otp_sent'] ?? false
-                ],
-                $result['message']
-            );
+            $responseData = [
+                'requires_otp' => true,
+                'email' => $result['email'],
+                'phone_number' => $result['phone_number'],
+                'otp_sent' => $result['otp_sent'] ?? false
+            ];
+
+            // Include OTP code in development
+            if (isset($result['otp_code'])) {
+                $responseData['otp_code'] = $result['otp_code'];
+            }
+
+            return $this->successResponse($responseData, $result['message']);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -171,7 +175,7 @@ class AuthController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"telephone","otp_code"},
-     *             @OA\Property(property="telephone", type="string", example="770000001"),
+     *     @OA\Property(property="telephone", type="string", example="705334611"),
      *             @OA\Property(property="otp_code", type="string", example="123456")
      *         )
      *     ),

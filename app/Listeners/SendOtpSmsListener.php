@@ -4,18 +4,21 @@ namespace App\Listeners;
 
 use App\Events\UserLoggedIn;
 use App\Interfaces\Notifications\TwilioServiceInterface;
+use App\Interfaces\Notifications\SendGridServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class SendOtpSmsListener
 {
     protected TwilioServiceInterface $twilioService;
+    protected SendGridServiceInterface $sendGridService;
 
     /**
      * Create the event listener.
      */
-    public function __construct(TwilioServiceInterface $twilioService)
+    public function __construct(TwilioServiceInterface $twilioService, SendGridServiceInterface $sendGridService)
     {
         $this->twilioService = $twilioService;
+        $this->sendGridService = $sendGridService;
     }
 
     /**
@@ -49,8 +52,6 @@ class SendOtpSmsListener
                 ]);
             }
 
-            // OTP par email désactivé - seulement SMS
-            /*
             // Envoyer l'OTP par email
             $userName = $event->user->nom . ' ' . $event->user->prenom;
             $emailSent = $this->sendGridService->sendEmailOtp($event->user->email, $otp->code, $userName);
@@ -68,7 +69,6 @@ class SendOtpSmsListener
                     'otp_id' => $otp->id,
                 ]);
             }
-            */
 
         } catch (\Exception $e) {
             Log::error('Erreur lors de l\'envoi de l\'OTP', [

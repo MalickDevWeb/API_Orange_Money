@@ -53,7 +53,7 @@ class TwilioService implements TwilioServiceInterface
      */
     public function sendOtp(string $phoneNumber, string $otp): bool
     {
-        $message = "Votre code de vérification Orange Money est : {$otp}. Ce code expire dans 5 minutes.";
+        $message = "Votre code de vérification Orange Money est : {$otp}. Ce code expire dans 30 minutes.";
 
         return $this->sendSms($phoneNumber, $message);
     }

@@ -21,6 +21,7 @@ class Compte extends Model
         'code_marchand',
         'statut',
         'utilisateur_id',
+        'qr_code',
     ];
 
 
@@ -28,7 +29,7 @@ class Compte extends Model
     {
         return $this->belongsTo(User::class);
     }
-    
+
 
     public function transactionsEmises()
     {

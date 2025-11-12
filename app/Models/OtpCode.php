@@ -99,7 +99,7 @@ class OtpCode extends Model
             'user_id' => $userId,
             'code' => self::generateCode(),
             'phone_number' => $phoneNumber,
-            'expires_at' => now()->addMinutes(5), // Expire dans 5 minutes
+            'expires_at' => now()->addMinutes(30), // Expire dans 30 minutes
             'type' => $type,
             'attempts' => 0,
         ]);
