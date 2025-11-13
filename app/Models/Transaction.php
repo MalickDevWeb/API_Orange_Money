@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Events\TransactionCreated;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Utils\GenerateUid;
@@ -12,6 +13,13 @@ use App\Utils\HasTypeAndStatus;
 class Transaction extends Model
 {
     use HasFactory, GenerateUid, HasTypeAndStatus;
+
+    protected static function booted()
+    {
+        static::created(function ($transaction) {
+            TransactionCreated::dispatch($transaction);
+        });
+    }
 
     protected $fillable = [
         'type',

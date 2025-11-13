@@ -30,11 +30,14 @@ use Illuminate\Http\Request;
  * )
  *
  * @OA\PathItem(
- *     path="/api/comptes"
+ *     path="/comptes"
  * )
  * @OA\PathItem(
- *     path="/api/comptes/{compte}"
+ *     path="/comptes/{compte}"
  * )
+ *
+ * @property-read \App\Models\User $user
+ * @method \Illuminate\Database\Eloquent\Relations\HasMany comptes()
  */
 class CompteController extends Controller
 {
@@ -54,7 +57,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/comptes/me",
+     *     path="/comptes/me",
      *     tags={"Comptes"},
      *     summary="Afficher les comptes de l'utilisateur connecté",
      *     security={{"bearerAuth":{}}},
@@ -87,6 +90,7 @@ class CompteController extends Controller
     public function me(Request $request)
     {
         try {
+            /** @var \App\Models\User $user */
             $user = auth()->user();
 
             // Check if supplier is approved
@@ -120,7 +124,9 @@ class CompteController extends Controller
     public function solde()
     {
         try {
-            $compte = auth()->user()->comptes()->where('statut', 'actif')->first();
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
+            $compte = $user->comptes()->where('statut', 'actif')->first();
             if (!$compte) {
                 return $this->errorResponse('Aucun compte actif trouvé', 404);
             }
@@ -134,41 +140,12 @@ class CompteController extends Controller
         }
     }
 
-    public function creer(Request $request)
+    public function activate(Compte $compte)
     {
         try {
-            $nom_compte = $request->query('nom_compte', 'Mon Compte');
-
-            // Générer numero_compte
-            $numero_compte = 'CMPT-' . strtoupper(substr($nom_compte, 0, 10)) . '-' . rand(100, 999);
-
-            // Vérifier unicité
-            while (\App\Models\Compte::where('numero_compte', $numero_compte)->exists()) {
-                $numero_compte = 'CMPT-' . strtoupper(substr($nom_compte, 0, 10)) . '-' . rand(100, 999);
-            }
-
-            $data = [
-                'numero_compte' => $numero_compte,
-                'titulaire' => auth()->user()->nom . ' ' . auth()->user()->prenom,
-                'utilisateur_id' => auth()->id(),
-                'statut' => 'inactif', // Par défaut inactif
-                'solde' => 0,
-            ];
-
-            $compte = $this->compteService->create($data);
-
-            return $this->successResponse($compte, 'Compte créé avec succès');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
-
-    public function activate($numero_compte)
-    {
-        try {
-            $compte = auth()->user()->comptes()->where('numero_compte', $numero_compte)->first();
-            if (!$compte) {
-                return $this->errorResponse('Compte non trouvé', 404);
+            // Vérifier que l'utilisateur possède ce compte
+            if ($compte->utilisateur_id !== auth()->id()) {
+                return $this->errorResponse('Accès non autorisé à ce compte', 403);
             }
 
             $this->compteService->update($compte->id, ['statut' => 'actif']);
@@ -179,115 +156,10 @@ class CompteController extends Controller
         }
     }
 
-    public function supprimerGet($numero_compte)
-    {
-        try {
-            $compte = auth()->user()->comptes()->where('numero_compte', $numero_compte)->first();
-            if (!$compte) {
-                return $this->errorResponse('Compte non trouvé', 404);
-            }
-
-            // Vérifier que le solde est <= 0
-            if ($compte->solde > 0) {
-                return $this->errorResponse('Impossible de supprimer un compte avec un solde positif', 400);
-            }
-
-            if ($compte->statut === 'actif') {
-                // Générer OTP pour confirmation
-                $otp = \App\Models\OtpCode::createForUser(
-                    auth()->id(),
-                    auth()->user()->telephone,
-                    'delete_compte',
-                    ['numero_compte' => $numero_compte]
-                );
-
-                // Envoyer OTP par SMS
-                $twilioService = app(\App\Services\TwilioService::class);
-                $smsSent = $twilioService->sendOtp('+221' . auth()->user()->telephone, $otp->code);
-
-                if (!$smsSent) {
-                    // Fallback email
-                    $emailService = app(\App\Interfaces\Notifications\EmailServiceInterface::class);
-                    $emailSent = $emailService->sendEmailOtp(auth()->user()->email, $otp->code, auth()->user()->nom . ' ' . auth()->user()->prenom);
-                }
-
-                $response = [
-                    'requires_confirmation' => true,
-                    'message' => 'Un code de confirmation a été envoyé pour supprimer le compte actif.'
-                ];
-
-                if (app()->environment('local')) {
-                    $response['otp_code'] = $otp->code; // Pour test en développement
-                }
-
-                return $this->successResponse($response, 'Confirmation requise');
-            } else {
-                // Supprimer directement
-                $result = $this->compteService->delete($compte->id);
-                if (!$result) {
-                    return $this->errorResponse('Erreur lors de la suppression du compte');
-                }
-
-                return $this->successResponse(null, 'Compte supprimé avec succès');
-            }
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
-
-    public function supprimer(Request $request)
-    {
-        try {
-            $data = $request->validate([
-                'numero_compte' => 'required|string',
-                'otp_code' => 'required|string|size:6',
-            ]);
-
-            $compte = auth()->user()->comptes()->where('numero_compte', $data['numero_compte'])->first();
-            if (!$compte) {
-                return $this->errorResponse('Compte non trouvé', 404);
-            }
-
-            // Vérifier que le solde est <= 0
-            if ($compte->solde > 0) {
-                return $this->errorResponse('Impossible de supprimer un compte avec un solde positif', 400);
-            }
-
-            // Vérifier OTP
-            $otpCode = \App\Models\OtpCode::findValidCode(
-                $data['otp_code'],
-                auth()->user()->telephone,
-                'delete_compte'
-            );
-
-            if (!$otpCode || !isset($otpCode->data['numero_compte']) || $otpCode->data['numero_compte'] !== $data['numero_compte']) {
-                return $this->errorResponse('Code OTP invalide', 400);
-            }
-
-            $otpCode->markAsUsed();
-
-            $result = $this->compteService->delete($compte->id);
-            if (!$result) {
-                return $this->errorResponse('Erreur lors de la suppression du compte');
-            }
-
-            // Si le compte supprimé était actif, activer un autre compte
-            if ($compte->statut === 'actif') {
-                $otherCompte = auth()->user()->comptes()->where('statut', '!=', 'actif')->first();
-                if ($otherCompte) {
-                    $this->compteService->update($otherCompte->id, ['statut' => 'actif']);
-                }
-            }
-
-            return $this->successResponse(null, 'Compte supprimé avec succès');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
 
     /**
      * @OA\Get(
-     *     path="/api/comptes",
+     *     path="/comptes",
      *     operationId="getComptes",
      *     tags={"Comptes"},
      *     summary="Lister tous les comptes de l'utilisateur connecté",
@@ -307,7 +179,8 @@ class CompteController extends Controller
     public function index(Request $request)
     {
         try {
-            if (!auth()->user()->isAdmin()) {
+            $user = auth()->user();
+            if ($user->type !== 'admin') {
                 return $this->errorResponse('Accès non autorisé. Seuls les administrateurs peuvent lister tous les comptes.', 403);
             }
 
@@ -321,7 +194,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/comptes",
+     *     path="/comptes",
      *     tags={"Comptes"},
      *     summary="Créer un nouveau compte",
      *     security={{"bearerAuth":{}}},
@@ -360,7 +233,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/comptes/{compte}",
+     *     path="/comptes/{compte}",
      *     tags={"Comptes"},
      *     summary="Afficher un compte spécifique",
      *     security={{"bearerAuth":{}}},
@@ -395,7 +268,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Put(
-     *     path="/api/comptes/{compte}",
+     *     path="/comptes/{compte}",
      *     tags={"Comptes"},
      *     summary="Mettre à jour un compte",
      *     security={{"bearerAuth":{}}},
@@ -441,33 +314,40 @@ class CompteController extends Controller
     }
 
     /**
-     * @OA\Delete(
-     *     path="/api/comptes/{compte}",
-     *     tags={"Comptes"},
-     *     summary="Supprimer un compte (soft delete)",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="compte",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string"),
-     *         description="ID du compte"
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Compte supprimé",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Compte supprimé avec succès")
-     *         )
-     *     ),
-     *     @OA\Response(response=404, description="Compte non trouvé")
-     * )
-     */
-    public function destroy(Compte $compte)
+      * @OA\Delete(
+      *     path="/comptes/{compte}",
+      *     tags={"Comptes"},
+      *     summary="Supprimer un compte (soft delete)",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\Parameter(
+      *         name="compte",
+      *         in="path",
+      *         required=true,
+      *         @OA\Schema(type="string"),
+      *         description="ID du compte"
+      *     ),
+      *     @OA\RequestBody(
+      *         @OA\JsonContent(
+      *             @OA\Property(property="otp_code", type="string", example="123456", description="Code OTP requis pour supprimer un compte actif")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=200,
+      *         description="Compte supprimé",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="message", type="string", example="Compte supprimé avec succès")
+      *         )
+      *     ),
+      *     @OA\Response(response=404, description="Compte non trouvé")
+      * )
+      */
+    public function destroy(Request $request, Compte $compte)
     {
         try {
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
             // Vérifier les permissions
-            if (!auth()->user()->isAdmin() && $compte->utilisateur_id !== auth()->id()) {
+            if ($user->type !== 'admin' && $compte->utilisateur_id !== $user->id) {
                 return $this->errorResponse('Accès non autorisé à ce compte', 403);
             }
 
@@ -476,9 +356,37 @@ class CompteController extends Controller
                 return $this->errorResponse('Impossible de supprimer un compte avec un solde positif', 400);
             }
 
+            // Si le compte est actif, vérifier OTP
+            if ($compte->statut === 'actif') {
+                $data = $request->validate([
+                    'otp_code' => 'required|string|size:6',
+                ]);
+
+                // Vérifier OTP
+                $otpCode = \App\Models\OtpCode::findValidCode(
+                    $data['otp_code'],
+                    $user->telephone,
+                    'delete_compte'
+                );
+
+                if (!$otpCode || !isset($otpCode->data['numero_compte']) || $otpCode->data['numero_compte'] !== $compte->numero_compte) {
+                    return $this->errorResponse('Code OTP invalide', 400);
+                }
+
+                $otpCode->markAsUsed();
+            }
+
             $result = $this->compteService->delete($compte->id);
             if (!$result) {
                 return $this->errorResponse('Erreur lors de la suppression du compte');
+            }
+
+            // Si le compte supprimé était actif, activer un autre compte
+            if ($compte->statut === 'actif') {
+                $otherCompte = $user->comptes()->where('statut', '!=', 'actif')->first();
+                if ($otherCompte) {
+                    $this->compteService->update($otherCompte->id, ['statut' => 'actif']);
+                }
             }
 
             return $this->successResponse(null, 'Compte supprimé avec succès');
@@ -489,7 +397,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/comptes/{compte}/restore",
+     *     path="/comptes/{compte}/restore",
      *     tags={"Comptes"},
      *     summary="Restaurer un compte supprimé",
      *     security={{"bearerAuth":{}}},
@@ -510,8 +418,9 @@ class CompteController extends Controller
     public function restore(Compte $compte)
     {
         try {
+            $user = auth()->user();
             // Vérifier les permissions
-            if (!auth()->user()->isAdmin() && $compte->utilisateur_id !== auth()->id()) {
+            if ($user->type !== 'admin' && $compte->utilisateur_id !== $user->id) {
                 return $this->errorResponse('Accès non autorisé à ce compte', 403);
             }
 
@@ -528,7 +437,7 @@ class CompteController extends Controller
 
     /**
      * @OA\Delete(
-     *     path="/api/comptes/{compte}/force-delete",
+     *     path="/comptes/{compte}/force-delete",
      *     tags={"Comptes"},
      *     summary="Supprimer définitivement un compte",
      *     security={{"bearerAuth":{}}},
@@ -551,8 +460,9 @@ class CompteController extends Controller
     public function forceDelete(Compte $compte)
     {
         try {
+            $user = auth()->user();
             // Vérifier les permissions
-            if (!auth()->user()->isAdmin() && $compte->utilisateur_id !== auth()->id()) {
+            if ($user->type !== 'admin' && $compte->utilisateur_id !== $user->id) {
                 return $this->errorResponse('Accès non autorisé à ce compte', 403);
             }
 

@@ -14,12 +14,10 @@ class UserAuthResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-         return [
+        return [
             'nom' => $this->nom,
             'prenom' => $this->prenom,
             'telephone' => $this->telephone,
         ];
     }
-
-    
 }

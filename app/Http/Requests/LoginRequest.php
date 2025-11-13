@@ -23,6 +23,7 @@ class LoginRequest extends FormRequest
     {
             return [
             'telephone' => 'required|string|regex:/^[0-9]{9,15}$/',
+            'pin' => 'nullable|string|size:4|regex:/^[0-9]{4}$/',
         ];
     }
 }

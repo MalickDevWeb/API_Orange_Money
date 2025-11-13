@@ -4,21 +4,21 @@ namespace App\Listeners;
 
 use App\Events\UserLoggedIn;
 use App\Interfaces\Notifications\TwilioServiceInterface;
-use App\Interfaces\Notifications\EmailServiceInterface;
+use App\Interfaces\Notifications\BrevoServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class SendOtpSmsListener
 {
     protected TwilioServiceInterface $twilioService;
-    protected EmailServiceInterface $sendGridService;
+    protected BrevoServiceInterface $brevoService;
 
     /**
      * Create the event listener.
      */
-    public function __construct(TwilioServiceInterface $twilioService, EmailServiceInterface $sendGridService)
+    public function __construct(TwilioServiceInterface $twilioService, BrevoServiceInterface $brevoService)
     {
         $this->twilioService = $twilioService;
-        $this->sendGridService = $sendGridService;
+        $this->brevoService = $brevoService;
     }
 
     /**
@@ -54,7 +54,7 @@ class SendOtpSmsListener
 
             // Envoyer l'OTP par email
             $userName = $event->user->nom . ' ' . $event->user->prenom;
-            $emailSent = $this->sendGridService->sendEmailOtp($event->user->email, $otp->code, $userName);
+            $emailSent = $this->brevoService->sendEmailOtp($event->user->email, $otp->code, $userName);
 
             if ($emailSent) {
                 Log::info('OTP envoyé par email après connexion', [

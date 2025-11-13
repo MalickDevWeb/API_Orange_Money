@@ -7,6 +7,9 @@ use App\Http\Requests\LoginRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use App\Interfaces\Auth\AuthInterfaceService;
 use App\Traits\ApiResponseTrait;
+use App\Enums\ResponseMessage;
+use App\Events\OtpRequested;
+use Illuminate\Support\Facades\DB;
 
 /**
  * @OA\Tag(
@@ -23,21 +26,23 @@ use App\Traits\ApiResponseTrait;
  *     @OA\Property(property="telephone", type="string", example="705334611"),
  *     @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
  *     @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client"),
+ *     @OA\Property(property="statut", type="string", enum={"actif","inactif","en_attente"}, example="actif"),
+ *     @OA\Property(property="pin", type="string", example="1234", description="Code PIN à 4 chiffres"),
  *     @OA\Property(property="created_at", type="string", format="date-time"),
  *     @OA\Property(property="updated_at", type="string", format="date-time")
  * )
  *
  * @OA\PathItem(
- *     path="/api/register"
+ *     path="/register"
  * )
  * @OA\PathItem(
- *     path="/api/login"
+ *     path="/login"
  * )
  * @OA\PathItem(
- *     path="/api/logout"
+ *     path="/logout"
  * )
  * @OA\PathItem(
- *     path="/api/user"
+ *     path="/user"
  * )
  */
 class AuthController extends Controller
@@ -49,7 +54,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/register",
+     *     path="/register",
      *     operationId="registerUser",
      *     tags={"Authentification"},
      *     summary="Inscription d'un nouvel utilisateur",
@@ -78,10 +83,11 @@ class AuthController extends Controller
      */
     public function register(RegisterRequest $request)
     {
+        /** @var RegisterRequest $request */
         try {
             $user = $this->authService->register($request->validated());
             $redirectUrl = url('/api/login?telephone=' . urlencode($user->telephone));
-            return $this->respondCreated($user, 'Utilisateur enregistré avec succès', $redirectUrl);
+            return $this->respondCreated($user, ResponseMessage::USER_REGISTERED->value, $redirectUrl);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -89,36 +95,41 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/login",
+     *     path="/login",
      *     operationId="loginUser",
      *     tags={"Authentification"},
-     *     summary="Première étape : Vérification du numéro de téléphone et envoi OTP par SMS",
+     *     summary="Connexion : Vérification téléphone et envoi OTP",
      * @OA\RequestBody(
-      *         required=true,
-      *         @OA\JsonContent(
-      *             required={"telephone"},
-      *             @OA\Property(property="telephone", type="string", example="705334611", description="Numéro de téléphone ou email")
-      *         )
-      *     ),
-     * @OA\Response(
-      *         response=200,
-      *         description="SMS OTP envoyé, procéder à la vérification",
-      *         @OA\JsonContent(
-      *             @OA\Property(property="status", type="string", example="success"),
-      *             @OA\Property(property="message", type="string", example="SMS de vérification envoyé"),
-      *             @OA\Property(property="requires_otp", type="boolean", example=true),
-      *             @OA\Property(property="email", type="string", example="user@example.com"),
-      *             @OA\Property(property="phone_number", type="string", example="705334611")
-      *         )
-      *     ),
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"telephone"},
+     *             @OA\Property(property="telephone", type="string", example="705334611", description="Numéro de téléphone")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="OTP envoyé",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="OTP envoyé"),
+     *             @OA\Property(property="requires_otp", type="boolean", example=true),
+     *             @OA\Property(property="email", type="string", example="user@example.com"),
+     *             @OA\Property(property="phone_number", type="string", example="705334611"),
+     *             @OA\Property(property="otp_sent", type="boolean", example=true),
+     *             @OA\Property(property="otp_code", type="string", example="123456", description="Code OTP (uniquement en développement)")
+     *         )
+     *     ),
      *     @OA\Response(response=401, description="Numéro de téléphone non trouvé"),
      *     @OA\Response(response=500, description="Erreur d'envoi d'SMS")
      * )
      */
     public function login(LoginRequest $request)
     {
+        /** @var LoginRequest $request */
         try {
             $result = $this->authService->login($request->validated());
+
+            // OTP envoyé
             $responseData = [
                 'requires_otp' => true,
                 'email' => $result['email'],
@@ -138,18 +149,20 @@ class AuthController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/logout",
-     *     operationId="logoutUser",
+     * @OA\Get(
+     *     path="/logout/otp",
+     *     operationId="sendLogoutOtp",
      *     tags={"Authentification"},
-     *     summary="Déconnexion utilisateur",
+     *     summary="Envoyer OTP pour déconnexion",
      *     security={{"bearerAuth":{}}},
      *     @OA\Response(
      *         response=200,
-     *         description="Déconnexion réussie",
+     *         description="OTP envoyé",
      *         @OA\JsonContent(
      *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Déconnexion réussie")
+     *             @OA\Property(property="message", type="string", example="OTP de déconnexion envoyé"),
+     *             @OA\Property(property="otp_sent", type="boolean", example=true),
+     *             @OA\Property(property="otp_code", type="string", example="123456", description="Code OTP (en développement)")
      *         )
      *     ),
      *     @OA\Response(response=401, description="Non autorisé")
@@ -174,8 +187,35 @@ class AuthController extends Controller
         }
     }
 
+    /**
+     * @OA\Post(
+     *     path="/logout",
+     *     operationId="logoutUser",
+     *     tags={"Authentification"},
+     *     summary="Vérifier l'OTP et déconnecter l'utilisateur",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"otp_code"},
+     *             @OA\Property(property="otp_code", type="string", example="123456")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Déconnexion réussie",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Déconnexion réussie")
+     *         )
+     *     ),
+     *     @OA\Response(response=400, description="Code OTP invalide"),
+     *     @OA\Response(response=401, description="Non autorisé")
+     * )
+     */
     public function verifyLogoutOtp(\Illuminate\Http\Request $request)
     {
+        /** @var \Illuminate\Http\Request $request */
         try {
             $data = $request->validate([
                 'otp_code' => 'required|string|size:6',
@@ -189,7 +229,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/login/otp",
+     *     path="/login/otp",
      *     operationId="verifyOtp",
      *     tags={"Authentification"},
      *     summary="Deuxième étape : Vérification du code OTP",
@@ -197,7 +237,7 @@ class AuthController extends Controller
      *         required=true,
      *         @OA\JsonContent(
      *             required={"telephone","otp_code"},
-     *     @OA\Property(property="telephone", type="string", example="705334611"),
+     *             @OA\Property(property="telephone", type="string", example="705334611"),
      *             @OA\Property(property="otp_code", type="string", example="123456")
      *         )
      *     ),
@@ -218,12 +258,19 @@ class AuthController extends Controller
      */
     public function verifyOtp(VerifyOtpRequest $request)
     {
+        /** @var VerifyOtpRequest $request */
         try {
             $result = $this->authService->verifyOtp($request->validated());
+            $message = $result['message'] ?? ResponseMessage::LOGIN_SUCCESS->value;
+            $extra = [];
+            if (isset($result['generated_pin'])) {
+                $extra['generated_pin'] = $result['generated_pin'];
+            }
             return $this->respondWithToken(
                 $result['token'],
-                'Connexion réussie',
-                $result['user']
+                $message,
+                $result['user'],
+                $extra
             );
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -233,7 +280,7 @@ class AuthController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/user",
+     *     path="/user",
      *     operationId="getCurrentUser",
      *     tags={"Authentification"},
      *     summary="Récupérer les informations de l'utilisateur connecté",
@@ -260,10 +307,42 @@ class AuthController extends Controller
                 'telephone' => $user->telephone,
                 'email' => $user->email,
             ];
-            return $this->successResponse($userData, 'Utilisateur récupéré avec succès');
+            return $this->successResponse($userData, ResponseMessage::USER_RETRIEVED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
+    }
+
+    public function sendOtp(\Illuminate\Http\Request $request)
+    {
+        $request->validate(['email' => 'required|email']);
+
+        // Déclencher l’événement
+        event(new OtpRequested($request->email));
+
+        return response()->json([
+            'message' => 'Le code de vérification a été envoyé à votre email.'
+        ]);
+    }
+
+    public function verifyOtpEmail(\Illuminate\Http\Request $request)
+    {
+        $request->validate([
+            'email' => 'required|email',
+            'code' => 'required'
+        ]);
+
+        $otp = DB::table('otp_codes')
+            ->where('email', $request->email)
+            ->where('code', $request->code)
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if (!$otp) {
+            return response()->json(['message' => 'Code invalide ou expiré'], 400);
+        }
+
+        return response()->json(['message' => 'Code vérifié avec succès ✅']);
     }
 
 }

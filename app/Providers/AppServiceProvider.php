@@ -22,6 +22,7 @@ use App\Interfaces\Auth\{
 
 use App\Interfaces\Notifications\{
   TwilioServiceInterface,
+  BrevoServiceInterface,
   EmailServiceInterface
 };
 
@@ -37,9 +38,7 @@ use App\Services\{
     TransactionService,
     AuthService,
     TwilioService,
-    BrevoService,
-    MailtrapService,
-    SendGridService
+    BrevoService
 };
 
 class AppServiceProvider extends ServiceProvider
@@ -56,6 +55,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(AuthInterfaceRepository::class, AuthRepository::class);
         $this->app->bind(AuthInterfaceService::class, AuthService::class);
         $this->app->bind(TwilioServiceInterface::class, TwilioService::class);
+        $this->app->bind(BrevoServiceInterface::class, BrevoService::class);
         $this->app->bind(EmailServiceInterface::class, BrevoService::class);
     }
 

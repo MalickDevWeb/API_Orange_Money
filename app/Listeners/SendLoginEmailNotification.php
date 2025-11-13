@@ -3,16 +3,16 @@
 namespace App\Listeners;
 
 use App\Events\UserLoggedIn;
-use App\Interfaces\Notifications\EmailServiceInterface;
+use App\Interfaces\Notifications\BrevoServiceInterface;
 use Illuminate\Support\Facades\Log;
 
 class SendLoginEmailNotification
 {
-    protected EmailServiceInterface $sendGridService;
+    protected BrevoServiceInterface $brevoService;
 
-    public function __construct(EmailServiceInterface $sendGridService)
+    public function __construct(BrevoServiceInterface $brevoService)
     {
-        $this->sendGridService = $sendGridService;
+        $this->brevoService = $brevoService;
     }
 
     public function handle(UserLoggedIn $event): void
@@ -28,7 +28,7 @@ class SendLoginEmailNotification
                 <p>— L’équipe Sécurité</p>
             ";
 
-            $this->sendGridService->sendEmail($user->email, $subject, $content);
+            $this->brevoService->sendEmail($user->email, $subject, $content);
         } catch (\Exception $e) {
             Log::error('Erreur lors de l’envoi de l’email de connexion', [
                 'user_id' => $event->user->id ?? null,

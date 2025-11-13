@@ -14,7 +14,7 @@ class UserResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-                return [
+        return [
             'id'        => $this->id,
             'nom'       => $this->nom,
             'prenom'    => $this->prenom,
@@ -23,6 +23,5 @@ class UserResource extends JsonResource
             'type'      => $this->type,
             'created_at' => $this->created_at->format('Y-m-d H:i'),
         ];
-
     }
 }

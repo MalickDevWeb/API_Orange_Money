@@ -71,7 +71,7 @@ trait ApiResponseTrait
     }
 
     // Réponse avec token
-    public function respondWithToken($token, string $message = 'Authentification réussie', $user = null): JsonResponse
+    public function respondWithToken($token, string $message = 'Authentification réussie', $user = null, array $extra = []): JsonResponse
     {
         try {
             $response = [
@@ -84,6 +84,8 @@ trait ApiResponseTrait
             if ($user) {
                 $response['user'] = new \App\Http\Resources\UserAuthResource($user);
             }
+
+            $response = array_merge($response, $extra);
 
             return response()->json($response, 200);
 

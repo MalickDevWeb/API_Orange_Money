@@ -33,22 +33,22 @@ use Illuminate\Support\Facades\DB;
  * )
  *
  * @OA\PathItem(
- *     path="/api/transactions"
+ *     path="/transactions"
  * )
  * @OA\PathItem(
- *     path="/api/transactions/{transaction}"
+ *     path="/transactions/{transaction}"
  * )
  * @OA\PathItem(
- *     path="/api/transactions/depot"
+ *     path="/transactions/depot"
  * )
  * @OA\PathItem(
- *     path="/api/transactions/retrait"
+ *     path="/transactions/retrait"
  * )
  * @OA\PathItem(
- *     path="/api/transactions/transfert"
+ *     path="/transactions/transfert"
  * )
  * @OA\PathItem(
- *     path="/api/transactions/paiement"
+ *     path="/transactions/paiement"
  * )
  */
 class TransactionController extends Controller
@@ -69,7 +69,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/transactions",
+     *     path="/transactions",
      *     tags={"Transactions"},
      *     summary="Lister toutes les transactions",
      *     security={{"bearerAuth":{}}},
@@ -88,7 +88,9 @@ class TransactionController extends Controller
         try {
             $query = Transaction::query();
 
-            if (!auth()->user()->isAdmin()) {
+            /** @var \App\Models\User $user */
+            $user = auth()->user();
+            if (!$user->isAdmin()) {
                 // Filter by user's comptes
                 $userComptes = auth()->user()->comptes->pluck('id');
                 $query->where(function($q) use ($userComptes) {
@@ -106,15 +108,15 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions",
+     *     path="/transactions",
      *     tags={"Transactions"},
      *     summary="Créer une nouvelle transaction",
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"type","montant","compte_emetteur_id","compte_recepteur_id"},
-     *             @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement"}, example="transfert"),
+     *             required={"type","montant"},
+     *             @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
      *             @OA\Property(property="montant", type="number", format="float", example=50000),
      *             @OA\Property(property="reference", type="string", example="TXN-123456"),
      *             @OA\Property(property="note", type="string", example="Paiement de facture"),
@@ -134,13 +136,68 @@ class TransactionController extends Controller
     {
         try {
             $data = $request->validate([
-                'type' => 'required|string|in:depot,retrait,transfert,paiement',
+                'type' => 'required|string|in:depot,retrait,transfert,paiement,achat_virtuel',
                 'montant' => 'required|numeric|min:0.01',
                 'reference' => 'nullable|string|unique:transactions,reference',
                 'note' => 'nullable|string',
-                'compte_emetteur_id' => 'required|exists:comptes,id',
-                'compte_recepteur_id' => 'required|exists:comptes,id|different:compte_emetteur_id',
+                'compte_emetteur_id' => 'nullable|exists:comptes,id',
+                'compte_recepteur_id' => 'nullable|exists:comptes,id',
             ]);
+
+            // Validation spécifique selon le type
+            switch ($data['type']) {
+                case 'depot':
+                    $request->validate([
+                        'compte_recepteur_id' => 'required|exists:comptes,id',
+                    ]);
+                    $data['compte_emetteur_id'] = null; // Système
+                    $data['reference'] = $data['reference'] ?? 'DEP-' . strtoupper(uniqid());
+                    break;
+
+                case 'retrait':
+                    $request->validate([
+                        'compte_emetteur_id' => 'required|exists:comptes,id',
+                    ]);
+                    // Vérifier le solde
+                    $compte = Compte::find($data['compte_emetteur_id']);
+                    if ($compte->solde < $data['montant']) {
+                        return $this->errorResponse('Solde insuffisant pour effectuer ce retrait', 400);
+                    }
+                    $data['compte_recepteur_id'] = null; // Système
+                    $data['reference'] = $data['reference'] ?? 'RET-' . strtoupper(uniqid());
+                    break;
+
+                case 'transfert':
+                case 'paiement':
+                    $request->validate([
+                        'compte_emetteur_id' => 'required|exists:comptes,id',
+                        'compte_recepteur_id' => 'required|exists:comptes,id|different:compte_emetteur_id',
+                    ]);
+                    // Vérifier le solde
+                    $compteEmetteur = Compte::find($data['compte_emetteur_id']);
+                    if ($compteEmetteur->solde < $data['montant']) {
+                        return $this->errorResponse('Solde insuffisant pour effectuer cette transaction', 400);
+                    }
+                    $data['reference'] = $data['reference'] ?? ($data['type'] === 'transfert' ? 'TRF-' : 'PAY-') . strtoupper(uniqid());
+                    break;
+
+                case 'achat_virtuel':
+                    // Vérifier que l'utilisateur est admin
+                    /** @var \App\Models\User $user */
+                    $user = auth()->user();
+                    if (!$user->isAdmin()) {
+                        return $this->errorResponse('Accès réservé aux administrateurs', 403);
+                    }
+                    // Trouver le compte admin
+                    $compteAdmin = auth()->user()->comptes->first();
+                    if (!$compteAdmin) {
+                        return $this->errorResponse('Aucun compte trouvé pour l\'administrateur', 404);
+                    }
+                    $data['compte_emetteur_id'] = null;
+                    $data['compte_recepteur_id'] = $compteAdmin->id;
+                    $data['reference'] = $data['reference'] ?? 'ACHAT-' . strtoupper(uniqid());
+                    break;
+            }
 
             // Générer une référence unique si non fournie
             if (empty($data['reference'])) {
@@ -159,7 +216,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/transactions/{transaction}",
+     *     path="/transactions/{transaction}",
      *     tags={"Transactions"},
      *     summary="Afficher une transaction spécifique",
      *     security={{"bearerAuth":{}}},
@@ -172,12 +229,12 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-         description="Transaction trouvée",
-         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     ),
-     @OA\Response(response=404, description="Transaction non trouvée")
- )
- */
+     *         description="Transaction trouvée",
+     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     *     ),
+     *     @OA\Response(response=404, description="Transaction non trouvée")
+     * )
+     */
     public function show(Transaction $transaction)
     {
         try {
@@ -189,7 +246,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Put(
-     *     path="/api/transactions/{transaction}",
+     *     path="/transactions/{transaction}",
      *     tags={"Transactions"},
      *     summary="Mettre à jour une transaction",
      *     security={{"bearerAuth":{}}},
@@ -208,11 +265,11 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-         description="Transaction mise à jour",
-         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     )
- )
- */
+     *         description="Transaction mise à jour",
+     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     *     )
+     * )
+     */
     public function update(Request $request, Transaction $transaction)
     {
         try {
@@ -234,7 +291,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Delete(
-     *     path="/api/transactions/{transaction}",
+     *     path="/transactions/{transaction}",
      *     tags={"Transactions"},
      *     summary="Supprimer une transaction",
      *     security={{"bearerAuth":{}}},
@@ -247,13 +304,13 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=200,
-         description="Transaction supprimée",
-         @OA\JsonContent(
-             @OA\Property(property="message", type="string", example="Transaction supprimée avec succès")
-         )
-     )
- )
- */
+     *         description="Transaction supprimée",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="message", type="string", example="Transaction supprimée avec succès")
+     *         )
+     *     )
+     * )
+     */
     public function destroy(Transaction $transaction)
     {
         try {
@@ -270,7 +327,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions/depot",
+     *     path="/transactions/depot",
      *     tags={"Transactions"},
      *     summary="Effectuer un dépôt sur un compte",
      *     security={{"bearerAuth":{}}},
@@ -285,11 +342,11 @@ class TransactionController extends Controller
      *     ),
      *     @OA\Response(
      *         response=201,
-         description="Dépôt effectué avec succès",
-         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     )
- )
- */
+     *         description="Dépôt effectué avec succès",
+     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     *     )
+     * )
+     */
     public function depot(Request $request)
     {
         try {
@@ -315,7 +372,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions/retrait",
+     *     path="/transactions/retrait",
      *     tags={"Transactions"},
      *     summary="Effectuer un retrait d'un compte",
      *     security={{"bearerAuth":{}}},
@@ -367,17 +424,16 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions/transfert",
+     *     path="/transactions/transfert",
      *     tags={"Transactions"},
-     *     summary="Effectuer un transfert entre comptes",
+     *     summary="Effectuer un transfert vers un autre client",
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"montant","compte_emetteur_id","compte_recepteur_id"},
      *             @OA\Property(property="montant", type="number", format="float", example=30000),
-             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-emetteur"),
-             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-recepteur"),
+             @OA\Property(property="numero_client", type="string", example="771234567"),
              @OA\Property(property="note", type="string", example="Transfert d'argent")
          )
      ),
@@ -394,18 +450,41 @@ class TransactionController extends Controller
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'compte_emetteur_id' => 'required|exists:comptes,id',
-                'compte_recepteur_id' => 'required|exists:comptes,id|different:compte_emetteur_id',
+                'numero_client' => 'required|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
 
+            // Trouver le compte émetteur (utilisateur authentifié)
+            /** @var \App\Models\User $userEmetteur */
+            $userEmetteur = auth()->user();
+            $compteEmetteur = $userEmetteur->comptes->first();
+            if (!$compteEmetteur) {
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur', 404);
+            }
+
+            // Trouver le compte récepteur par numéro de téléphone du client
+            $userRecepteur = \App\Models\User::where('telephone', $data['numero_client'])->first();
+            if (!$userRecepteur) {
+                return $this->errorResponse('Client destinataire non trouvé', 404);
+            }
+            $compteRecepteur = $userRecepteur->comptes->first();
+            if (!$compteRecepteur) {
+                return $this->errorResponse('Aucun compte trouvé pour le client destinataire', 404);
+            }
+
+            // Vérifier que les comptes sont différents
+            if ($compteEmetteur->id === $compteRecepteur->id) {
+                return $this->errorResponse('Impossible de transférer vers le même compte', 400);
+            }
+
             // Vérifier le solde du compte émetteur
-            $compteEmetteur = Compte::find($data['compte_emetteur_id']);
             if ($compteEmetteur->solde < $data['montant']) {
                 return $this->errorResponse('Solde insuffisant pour effectuer ce transfert', 400);
             }
 
             $data['type'] = 'transfert';
+            $data['compte_emetteur_id'] = $compteEmetteur->id;
+            $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'TRF-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
             $data['date_transaction'] = now();
@@ -419,7 +498,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions/paiement",
+     *     path="/transactions/paiement",
      *     tags={"Transactions"},
      *     summary="Effectuer un paiement (client vers commerçant)",
      *     security={{"bearerAuth":{}}},
@@ -446,18 +525,37 @@ class TransactionController extends Controller
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'compte_emetteur_id' => 'required|exists:comptes,id',
-                'compte_recepteur_id' => 'required|exists:comptes,id|different:compte_emetteur_id',
+                'code_marchand' => 'required|string|exists:comptes,code_marchand',
                 'note' => 'nullable|string',
             ]);
 
+            // Trouver le compte émetteur (utilisateur authentifié)
+            /** @var \App\Models\User $userEmetteur */
+            $userEmetteur = auth()->user();
+            $compteEmetteur = $userEmetteur->comptes->first();
+            if (!$compteEmetteur) {
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur', 404);
+            }
+
+            // Trouver le compte récepteur par code marchand
+            $compteRecepteur = Compte::where('code_marchand', $data['code_marchand'])->first();
+            if (!$compteRecepteur) {
+                return $this->errorResponse('Marchand non trouvé', 404);
+            }
+
+            // Vérifier que les comptes sont différents
+            if ($compteEmetteur->id === $compteRecepteur->id) {
+                return $this->errorResponse('Impossible de payer vers le même compte', 400);
+            }
+
             // Vérifier le solde du compte émetteur
-            $compteEmetteur = Compte::find($data['compte_emetteur_id']);
             if ($compteEmetteur->solde < $data['montant']) {
                 return $this->errorResponse('Solde insuffisant pour effectuer ce paiement', 400);
             }
 
             $data['type'] = 'paiement';
+            $data['compte_emetteur_id'] = $compteEmetteur->id;
+            $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'PAY-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
             $data['date_transaction'] = now();
@@ -471,7 +569,7 @@ class TransactionController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/transactions/achat-virtuel",
+     *     path="/transactions/achat-virtuel",
      *     tags={"Transactions"},
      *     summary="Achat d'argent virtuel par l'admin",
      *     security={{"bearerAuth":{}}},
@@ -495,6 +593,7 @@ class TransactionController extends Controller
     {
         try {
             // Vérifier que l'utilisateur est admin
+            /** @var \App\Models\User $adminUser */
             $adminUser = auth()->user();
             if (!$adminUser->isAdmin()) {
                 return $this->errorResponse('Accès réservé aux administrateurs', 403);

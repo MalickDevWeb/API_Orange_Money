@@ -11,11 +11,11 @@
             "description": "Serveur de développement"
         },
         {
-            "url": "/api"
+            "url": ""
         }
     ],
     "paths": {
-        "/api/register": {
+        "/register": {
             "post": {
                 "tags": [
                     "Authentification"
@@ -100,12 +100,12 @@
                 }
             }
         },
-        "/api/login": {
+        "/login": {
             "post": {
                 "tags": [
                     "Authentification"
                 ],
-                "summary": "Première étape : Vérification du numéro de téléphone et envoi OTP par SMS",
+                "summary": "Connexion : Vérification téléphone et envoi OTP",
                 "operationId": "loginUser",
                 "requestBody": {
                     "required": true,
@@ -117,7 +117,7 @@
                                 ],
                                 "properties": {
                                     "telephone": {
-                                        "description": "Numéro de téléphone ou email",
+                                        "description": "Numéro de téléphone",
                                         "type": "string",
                                         "example": "705334611"
                                     }
@@ -129,7 +129,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "SMS OTP envoyé, procéder à la vérification",
+                        "description": "OTP envoyé",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -140,7 +140,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "SMS de vérification envoyé"
+                                            "example": "OTP envoyé"
                                         },
                                         "requires_otp": {
                                             "type": "boolean",
@@ -153,6 +153,15 @@
                                         "phone_number": {
                                             "type": "string",
                                             "example": "705334611"
+                                        },
+                                        "otp_sent": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "otp_code": {
+                                            "description": "Code OTP (uniquement en développement)",
+                                            "type": "string",
+                                            "example": "123456"
                                         }
                                     },
                                     "type": "object"
@@ -169,13 +178,32 @@
                 }
             }
         },
-        "/api/logout": {
+        "/logout": {
             "post": {
                 "tags": [
                     "Authentification"
                 ],
-                "summary": "Déconnexion utilisateur",
+                "summary": "Vérifier l'OTP et déconnecter l'utilisateur",
                 "operationId": "logoutUser",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "otp_code"
+                                ],
+                                "properties": {
+                                    "otp_code": {
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Déconnexion réussie",
@@ -197,6 +225,9 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Code OTP invalide"
+                    },
                     "401": {
                         "description": "Non autorisé"
                     }
@@ -208,7 +239,7 @@
                 ]
             }
         },
-        "/api/user": {
+        "/user": {
             "get": {
                 "tags": [
                     "Authentification"
@@ -248,9 +279,87 @@
                         "bearerAuth": []
                     }
                 ]
+            },
+            "put": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Mettre à jour le profil utilisateur",
+                "operationId": "updateProfile",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "nom": {
+                                        "type": "string",
+                                        "example": "Dupont"
+                                    },
+                                    "prenom": {
+                                        "type": "string",
+                                        "example": "Jean"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email",
+                                        "example": "jean.dupont@example.com"
+                                    },
+                                    "current_pin": {
+                                        "description": "PIN actuel requis pour changer le PIN",
+                                        "type": "string",
+                                        "example": "1234"
+                                    },
+                                    "new_pin": {
+                                        "description": "Nouveau PIN (4 chiffres)",
+                                        "type": "string",
+                                        "example": "5678"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Profil mis à jour",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Profil mis à jour avec succès"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/User"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Données invalides"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
             }
         },
-        "/api/comptes": {
+        "/comptes": {
             "get": {
                 "tags": [
                     "Comptes"
@@ -299,7 +408,7 @@
                     "Comptes"
                 ],
                 "summary": "Créer un nouveau compte",
-                "operationId": "POST::/api/comptes::App\\Http\\Controllers\\CompteController::store",
+                "operationId": "POST::/comptes::App\\Http\\Controllers\\CompteController::store",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -360,13 +469,13 @@
                 ]
             }
         },
-        "/api/comptes/{compte}": {
+        "/comptes/{compte}": {
             "get": {
                 "tags": [
                     "Comptes"
                 ],
                 "summary": "Afficher un compte spécifique",
-                "operationId": "GET::/api/comptes/{compte}::App\\Http\\Controllers\\CompteController::show",
+                "operationId": "GET::/comptes/{compte}::App\\Http\\Controllers\\CompteController::show",
                 "parameters": [
                     {
                         "name": "compte",
@@ -404,7 +513,7 @@
                     "Comptes"
                 ],
                 "summary": "Mettre à jour un compte",
-                "operationId": "PUT::/api/comptes/{compte}::App\\Http\\Controllers\\CompteController::update",
+                "operationId": "PUT::/comptes/{compte}::App\\Http\\Controllers\\CompteController::update",
                 "parameters": [
                     {
                         "name": "compte",
@@ -470,7 +579,7 @@
                     "Comptes"
                 ],
                 "summary": "Supprimer un compte (soft delete)",
-                "operationId": "DELETE::/api/comptes/{compte}::App\\Http\\Controllers\\CompteController::destroy",
+                "operationId": "DELETE::/comptes/{compte}::App\\Http\\Controllers\\CompteController::destroy",
                 "parameters": [
                     {
                         "name": "compte",
@@ -482,6 +591,22 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "otp_code": {
+                                        "description": "Code OTP requis pour supprimer un compte actif",
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
                         "description": "Compte supprimé",
@@ -510,13 +635,13 @@
                 ]
             }
         },
-        "/api/transactions": {
+        "/transactions": {
             "get": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Lister toutes les transactions",
-                "operationId": "GET::/api/transactions::App\\Http\\Controllers\\TransactionController::index",
+                "operationId": "GET::/transactions::App\\Http\\Controllers\\TransactionController::index",
                 "responses": {
                     "200": {
                         "description": "Liste des transactions récupérée",
@@ -543,7 +668,7 @@
                     "Transactions"
                 ],
                 "summary": "Créer une nouvelle transaction",
-                "operationId": "POST::/api/transactions::App\\Http\\Controllers\\TransactionController::store",
+                "operationId": "POST::/transactions::App\\Http\\Controllers\\TransactionController::store",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -551,9 +676,7 @@
                             "schema": {
                                 "required": [
                                     "type",
-                                    "montant",
-                                    "compte_emetteur_id",
-                                    "compte_recepteur_id"
+                                    "montant"
                                 ],
                                 "properties": {
                                     "type": {
@@ -562,7 +685,8 @@
                                             "depot",
                                             "retrait",
                                             "transfert",
-                                            "paiement"
+                                            "paiement",
+                                            "achat_virtuel"
                                         ],
                                         "example": "transfert"
                                     },
@@ -615,13 +739,13 @@
                 ]
             }
         },
-        "/api/transactions/{transaction}": {
+        "/transactions/{transaction}": {
             "get": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Afficher une transaction spécifique",
-                "operationId": "GET::/api/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::show",
+                "operationId": "GET::/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::show",
                 "parameters": [
                     {
                         "name": "transaction",
@@ -659,7 +783,7 @@
                     "Transactions"
                 ],
                 "summary": "Mettre à jour une transaction",
-                "operationId": "PUT::/api/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::update",
+                "operationId": "PUT::/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::update",
                 "parameters": [
                     {
                         "name": "transaction",
@@ -718,7 +842,7 @@
                     "Transactions"
                 ],
                 "summary": "Supprimer une transaction",
-                "operationId": "DELETE::/api/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::destroy",
+                "operationId": "DELETE::/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::destroy",
                 "parameters": [
                     {
                         "name": "transaction",
@@ -755,13 +879,13 @@
                 ]
             }
         },
-        "/api/transactions/depot": {
+        "/transactions/depot": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Effectuer un dépôt sur un compte",
-                "operationId": "POST::/api/transactions/depot::App\\Http\\Controllers\\TransactionController::depot",
+                "operationId": "POST::/transactions/depot::App\\Http\\Controllers\\TransactionController::depot",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -810,13 +934,13 @@
                 ]
             }
         },
-        "/api/transactions/retrait": {
+        "/transactions/retrait": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Effectuer un retrait d'un compte",
-                "operationId": "POST::/api/transactions/retrait::App\\Http\\Controllers\\TransactionController::retrait",
+                "operationId": "POST::/transactions/retrait::App\\Http\\Controllers\\TransactionController::retrait",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -868,13 +992,13 @@
                 ]
             }
         },
-        "/api/transactions/transfert": {
+        "/transactions/transfert": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Effectuer un transfert entre comptes",
-                "operationId": "POST::/api/transactions/transfert::App\\Http\\Controllers\\TransactionController::transfert",
+                "summary": "Effectuer un transfert vers un autre client",
+                "operationId": "POST::/transactions/transfert::App\\Http\\Controllers\\TransactionController::transfert",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -891,13 +1015,9 @@
                                         "format": "float",
                                         "example": 30000
                                     },
-                                    "compte_emetteur_id": {
+                                    "numero_client": {
                                         "type": "string",
-                                        "example": "uuid-compte-emetteur"
-                                    },
-                                    "compte_recepteur_id": {
-                                        "type": "string",
-                                        "example": "uuid-compte-recepteur"
+                                        "example": "771234567"
                                     },
                                     "note": {
                                         "type": "string",
@@ -931,13 +1051,13 @@
                 ]
             }
         },
-        "/api/transactions/paiement": {
+        "/transactions/paiement": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Effectuer un paiement (client vers commerçant)",
-                "operationId": "POST::/api/transactions/paiement::App\\Http\\Controllers\\TransactionController::paiement",
+                "operationId": "POST::/transactions/paiement::App\\Http\\Controllers\\TransactionController::paiement",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -994,7 +1114,7 @@
                 ]
             }
         },
-        "/api/admin/users/pending": {
+        "/admin/users/pending": {
             "get": {
                 "tags": [
                     "Administration"
@@ -1035,7 +1155,7 @@
                 ]
             }
         },
-        "/api/admin/users/{id}/approve": {
+        "/admin/users/{id}/approve": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1087,7 +1207,7 @@
                 ]
             }
         },
-        "/api/admin/users/{id}/reject": {
+        "/admin/users/{id}/reject": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1155,7 +1275,7 @@
                 ]
             }
         },
-        "/api/admin/balance-requests/pending": {
+        "/admin/balance-requests/pending": {
             "get": {
                 "tags": [
                     "Administration"
@@ -1210,7 +1330,7 @@
                 ]
             }
         },
-        "/api/admin/balance-requests/{id}/approve": {
+        "/admin/balance-requests/{id}/approve": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1262,7 +1382,7 @@
                 ]
             }
         },
-        "/api/admin/balance-requests/{id}/reject": {
+        "/admin/balance-requests/{id}/reject": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1330,7 +1450,7 @@
                 ]
             }
         },
-        "/api/admin/deposit": {
+        "/admin/deposit": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1401,7 +1521,55 @@
                 ]
             }
         },
-        "/api/login/otp": {
+        "/logout/otp": {
+            "get": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Envoyer OTP pour déconnexion",
+                "operationId": "sendLogoutOtp",
+                "responses": {
+                    "200": {
+                        "description": "OTP envoyé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OTP de déconnexion envoyé"
+                                        },
+                                        "otp_sent": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "otp_code": {
+                                            "description": "Code OTP (en développement)",
+                                            "type": "string",
+                                            "example": "123456"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/login/otp": {
             "post": {
                 "tags": [
                     "Authentification"
@@ -1472,13 +1640,13 @@
                 }
             }
         },
-        "/api/comptes/me": {
+        "/comptes/me": {
             "get": {
                 "tags": [
                     "Comptes"
                 ],
                 "summary": "Afficher les comptes de l'utilisateur connecté",
-                "operationId": "GET::/api/comptes/me::App\\Http\\Controllers\\CompteController::me",
+                "operationId": "GET::/comptes/me::App\\Http\\Controllers\\CompteController::me",
                 "parameters": [
                     {
                         "name": "all",
@@ -1556,13 +1724,13 @@
                 ]
             }
         },
-        "/api/comptes/{compte}/restore": {
+        "/comptes/{compte}/restore": {
             "post": {
                 "tags": [
                     "Comptes"
                 ],
                 "summary": "Restaurer un compte supprimé",
-                "operationId": "POST::/api/comptes/{compte}/restore::App\\Http\\Controllers\\CompteController::restore",
+                "operationId": "POST::/comptes/{compte}/restore::App\\Http\\Controllers\\CompteController::restore",
                 "parameters": [
                     {
                         "name": "compte",
@@ -1593,13 +1761,13 @@
                 ]
             }
         },
-        "/api/comptes/{compte}/force-delete": {
+        "/comptes/{compte}/force-delete": {
             "delete": {
                 "tags": [
                     "Comptes"
                 ],
                 "summary": "Supprimer définitivement un compte",
-                "operationId": "DELETE::/api/comptes/{compte}/force-delete::App\\Http\\Controllers\\CompteController::forceDelete",
+                "operationId": "DELETE::/comptes/{compte}/force-delete::App\\Http\\Controllers\\CompteController::forceDelete",
                 "parameters": [
                     {
                         "name": "compte",
@@ -1636,13 +1804,13 @@
                 ]
             }
         },
-        "/api/transactions/achat-virtuel": {
+        "/transactions/achat-virtuel": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
                 "summary": "Achat d'argent virtuel par l'admin",
-                "operationId": "POST::/api/transactions/achat-virtuel::App\\Http\\Controllers\\TransactionController::achatVirtuel",
+                "operationId": "POST::/transactions/achat-virtuel::App\\Http\\Controllers\\TransactionController::achatVirtuel",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1689,7 +1857,7 @@
                 ]
             }
         },
-        "/api/suppliers/balance-request": {
+        "/suppliers/balance-request": {
             "post": {
                 "tags": [
                     "Fournisseurs"
@@ -1784,6 +1952,20 @@
                             "fournisseur"
                         ],
                         "example": "client"
+                    },
+                    "statut": {
+                        "type": "string",
+                        "enum": [
+                            "actif",
+                            "inactif",
+                            "en_attente"
+                        ],
+                        "example": "actif"
+                    },
+                    "pin": {
+                        "description": "Code PIN à 4 chiffres",
+                        "type": "string",
+                        "example": "1234"
                     },
                     "created_at": {
                         "type": "string",
@@ -1929,7 +2111,7 @@
     "tags": [
         {
             "name": "Administration",
-            "description": "Endpoints pour l'administration des utilisateurs"
+            "description": "Endpoints pour les administrateurs"
         },
         {
             "name": "Authentification",
@@ -1942,6 +2124,10 @@
         {
             "name": "Transactions",
             "description": "Gestion des transactions financières"
+        },
+        {
+            "name": "Utilisateurs",
+            "description": "Endpoints pour la gestion des utilisateurs"
         },
         {
             "name": "Fournisseurs",

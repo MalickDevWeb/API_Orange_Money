@@ -8,6 +8,8 @@ use App\Interfaces\Auth\AuthInterfaceRepository;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use App\Events\UserLoggedIn;
+use App\Enums\ResponseMessage;
+use App\Enums\MessagesErreursRequests;
 
 
 use App\Interfaces\Auth\AuthInterfaceService;
@@ -28,12 +30,12 @@ class AuthService implements AuthInterfaceService
 
            // Vérifier l'unicité de l'email
            if (User::where('email', $data['email'])->exists()) {
-               $errors[] = 'L\'email est déjà utilisé.';
+               $errors[] = MessagesErreursRequests::EMAIL_EXISTS->value;
            }
 
            // Vérifier l'unicité du téléphone
            if (User::where('telephone', $data['telephone'])->exists()) {
-               $errors[] = 'Le numéro de téléphone est déjà utilisé.';
+               $errors[] = MessagesErreursRequests::TELEPHONE_EXISTS->value;
            }
 
            // Si des erreurs, les combiner
@@ -64,7 +66,15 @@ class AuthService implements AuthInterfaceService
          try {
              $user = $this->authRepo->login($credentials);
 
-             // Créer OTP
+             // Vérifier si l'utilisateur commerçant ou fournisseur est approuvé
+             if (($user->isCommercant() || $user->isFournisseur()) && !$user->isActif()) {
+                 $message = $user->isCommercant()
+                     ? MessagesErreursRequests::ACCOUNT_PENDING_APPROVAL_COMMERCHANT->value
+                     : MessagesErreursRequests::ACCOUNT_PENDING_APPROVAL_SUPPLIER->value;
+                 throw new Exception($message);
+             }
+
+             // Envoyer OTP
              $otp = \App\Models\OtpCode::createForUser(
                  $user->id,
                  $user->telephone,
@@ -78,7 +88,7 @@ class AuthService implements AuthInterfaceService
              $emailSent = false;
              if (!$smsSent) {
                  // Fallback to email if SMS fails
-                 $brevoService = app(\App\Interfaces\Notifications\EmailServiceInterface::class);
+                 $brevoService = app(\App\Interfaces\Notifications\BrevoServiceInterface::class);
                  $userName = $user->nom . ' ' . $user->prenom;
                  $emailSent = $brevoService->sendEmailOtp($user->email, $otp->code, $userName);
              }
@@ -115,11 +125,11 @@ class AuthService implements AuthInterfaceService
             );
 
             if (!$otpCode) {
-                throw new Exception('Code OTP invalide ou expiré');
+                throw new Exception(MessagesErreursRequests::OTP_INVALID->value);
             }
 
             if ($otpCode->hasExceededMaxAttempts(3)) {
-                throw new Exception('Trop de tentatives, veuillez réessayer plus tard');
+                throw new Exception(MessagesErreursRequests::OTP_EXCEEDED_ATTEMPTS->value);
             }
 
             // Incrémenter les tentatives
@@ -129,9 +139,11 @@ class AuthService implements AuthInterfaceService
             $otpCode->markAsUsed();
 
             // Vérifier si l'utilisateur commerçant ou fournisseur est approuvé
-            if (in_array($otpCode->user->type, ['commercant', 'fournisseur']) && $otpCode->user->statut !== 'actif') {
-                $typeLabel = $otpCode->user->type === 'commercant' ? 'commerçant' : 'fournisseur';
-                throw new Exception("Votre compte $typeLabel est en attente d'approbation par l'administrateur.");
+            if (($otpCode->user->isCommercant() || $otpCode->user->isFournisseur()) && !$otpCode->user->isActif()) {
+                $message = $otpCode->user->isCommercant()
+                    ? MessagesErreursRequests::ACCOUNT_PENDING_APPROVAL_COMMERCHANT->value
+                    : MessagesErreursRequests::ACCOUNT_PENDING_APPROVAL_SUPPLIER->value;
+                throw new Exception($message);
             }
 
             // Générer le token
@@ -140,10 +152,12 @@ class AuthService implements AuthInterfaceService
             // Fire the event after successful login
             event(new UserLoggedIn($otpCode->user));
 
-            return [
+            $response = [
                 'user' => $otpCode->user,
                 'token' => $token
             ];
+
+            return $response;
         } catch (Exception $e) {
             Log::error('Erreur lors de la vérification OTP : ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString(),
@@ -172,7 +186,7 @@ class AuthService implements AuthInterfaceService
             $emailSent = false;
             if (!$smsSent) {
                 // Fallback to email if SMS fails
-                $brevoService = app(\App\Interfaces\Notifications\EmailServiceInterface::class);
+                $brevoService = app(\App\Interfaces\Notifications\BrevoServiceInterface::class);
                 $userName = $user->nom . ' ' . $user->prenom;
                 $emailSent = $brevoService->sendEmailOtp($user->email, $otp->code, $userName);
             }
@@ -195,6 +209,10 @@ class AuthService implements AuthInterfaceService
         }
     }
 
+    /**
+     * @param array $data
+     * @return array
+     */
     public function verifyLogoutOtp(array $data): array
     {
         try {
@@ -208,11 +226,11 @@ class AuthService implements AuthInterfaceService
                 ->first();
 
             if (!$otpCode) {
-                throw new Exception('Code OTP invalide ou expiré');
+                throw new Exception(MessagesErreursRequests::OTP_INVALID->value);
             }
 
             if ($otpCode->hasExceededMaxAttempts(3)) {
-                throw new Exception('Trop de tentatives, veuillez réessayer plus tard');
+                throw new Exception(MessagesErreursRequests::OTP_EXCEEDED_ATTEMPTS->value);
             }
 
             // Incrémenter les tentatives

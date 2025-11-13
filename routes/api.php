@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AdminController;
+use App\Enums\T;
 
 /*
 |--------------------------------------------------------------------------
@@ -24,11 +25,14 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::post('register', [AuthController::class, 'register']);
 Route::post('login', [AuthController::class, 'login']);
 Route::post('login/otp', [AuthController::class, 'verifyOtp']);
+Route::post('send-otp', [AuthController::class, 'sendOtp']);
+Route::post('verify-otp-email', [AuthController::class, 'verifyOtpEmail']);
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(T::passport->value)->group(function () {
     Route::get('logout/otp', [AuthController::class, 'sendLogoutOtp']);
     Route::post('logout', [AuthController::class, 'verifyLogoutOtp']);
     Route::get('user', [AuthController::class, 'user']);
+    Route::put('user', [UserController::class, 'updateProfile']);
 });
 
 Route::get('/status', function () {
@@ -36,29 +40,21 @@ Route::get('/status', function () {
 });
 
 // Routes pour les comptes
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(T::passport->value)->group(function () {
     Route::get('comptes/me', [\App\Http\Controllers\CompteController::class, 'me']);
-    Route::get('comptes/solde', [\App\Http\Controllers\CompteController::class, 'solde']);
-    Route::get('comptes/creer', [\App\Http\Controllers\CompteController::class, 'creer']);
-    Route::get('comptes/activate/{numero_compte}', [\App\Http\Controllers\CompteController::class, 'activate']);
-    Route::get('comptes/supprimer/{numero_compte}', [\App\Http\Controllers\CompteController::class, 'supprimerGet']);
-    Route::post('comptes/supprimer', [\App\Http\Controllers\CompteController::class, 'supprimer']);
+    Route::get('comptes/me/balance', [\App\Http\Controllers\CompteController::class, 'solde']);
+    Route::post('comptes/{compte}/activate', [\App\Http\Controllers\CompteController::class, 'activate']);
     Route::apiResource('comptes', \App\Http\Controllers\CompteController::class);
     Route::post('comptes/{compte}/restore', [\App\Http\Controllers\CompteController::class, 'restore']);
     Route::delete('comptes/{compte}/force-delete', [\App\Http\Controllers\CompteController::class, 'forceDelete']);
 });
 
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware(T::passport->value)->group(function () {
     Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class);
-    Route::post('transactions/depot', [\App\Http\Controllers\TransactionController::class, 'depot']);
-    Route::post('transactions/retrait', [\App\Http\Controllers\TransactionController::class, 'retrait']);
-    Route::post('transactions/transfert', [\App\Http\Controllers\TransactionController::class, 'transfert']);
-    Route::post('transactions/paiement', [\App\Http\Controllers\TransactionController::class, 'paiement']);
-    Route::post('transactions/achat-virtuel', [\App\Http\Controllers\TransactionController::class, 'achatVirtuel']);
 });
 
 // Routes d'administration
-Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
+Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::get('users/pending', [AdminController::class, 'getPendingUsers']);
     Route::post('users/{id}/approve', [AdminController::class, 'approveUser']);
     Route::post('users/{id}/reject', [AdminController::class, 'rejectUser']);
@@ -69,6 +65,6 @@ Route::middleware('auth:sanctum')->prefix('admin')->group(function () {
 });
 
 // Routes fournisseurs
-Route::middleware('auth:sanctum')->prefix('suppliers')->group(function () {
+Route::middleware(T::passport->value)->prefix('suppliers')->group(function () {
     Route::post('balance-request', [UserController::class, 'requestBalance']);
 });

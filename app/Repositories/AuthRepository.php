@@ -33,7 +33,7 @@ class AuthRepository implements AuthInterfaceRepository
     public function logout(): void
     {
         // Revoke the current access token
-        $user = auth('api')->user();
+        $user = auth('sanctum')->user();
         if ($user) {
             $user->tokens->each(function ($token) {
                 $token->delete();
@@ -43,6 +43,6 @@ class AuthRepository implements AuthInterfaceRepository
 
     public function user(): User
     {
-        return auth('api')->user();
+        return auth('sanctum')->user();
     }
 }

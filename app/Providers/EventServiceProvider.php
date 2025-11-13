@@ -25,6 +25,15 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\UserLoggedIn::class => [
             \App\Listeners\SendOtpSmsListener::class,
         ],
+        \App\Events\OtpRequested::class => [
+            \App\Listeners\SendOtpEmailListener::class,
+        ],
+        \App\Events\TransactionCreated::class => [
+            \App\Listeners\SendTransactionEmailListener::class,
+        ],
+        \App\Events\NotificationTestRequested::class => [
+            \App\Listeners\HandleNotificationTest::class,
+        ],
     ];
 
     /**

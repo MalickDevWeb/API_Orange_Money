@@ -10,11 +10,12 @@
         "endroid/qr-code": "^6.0",
         "getbrevo/brevo-php": "^2.0",
         "guzzlehttp/guzzle": "^7.10",
+        "juanparati/sendinblue": "^10.0",
         "laravel/framework": "^10.10",
         "laravel/passport": "*",
         "laravel/sanctum": "^3.3",
         "laravel/tinker": "^2.8",
-        "sendgrid/sendgrid": "^8.1",
+        "sendinblue/api-v3-sdk": "^8.4",
         "twilio/sdk": "^8.8"
     },
     "require-dev": {

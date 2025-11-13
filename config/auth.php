@@ -41,7 +41,7 @@ return [
             'provider' => 'users',
         ],
 
-        'api' => [
+        'sanctum' => [
             'driver' => 'sanctum',
             'provider' => 'users',
         ],
@@ -116,11 +116,5 @@ return [
     */
 
     'password_timeout' => 10800,
-
-    'api' => [
-        'driver' => 'passport',
-        'provider' => 'users',
-        'hash' => false,
-    ],
 
 ];

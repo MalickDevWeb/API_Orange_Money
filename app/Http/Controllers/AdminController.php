@@ -5,8 +5,14 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\BalanceRequest;
 use App\Traits\ApiResponseTrait;
+use App\Traits\TryCatchTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Enums\ResponseMessage;
+use App\Enums\MessagesErreursRequests;
+use App\Enums\UserType;
+use App\Enums\{UserStatus, BalanceRequestStatus, TransactionType, TransactionStatus};
+use App\Enums\T;
 
 /**
  * @OA\Tag(
@@ -16,14 +22,14 @@ use Illuminate\Support\Facades\Auth;
  */
 class AdminController extends Controller
 {
-    use ApiResponseTrait;
+    use ApiResponseTrait, TryCatchTrait;
 
     public function __construct()
     {
-        $this->middleware('auth:sanctum');
+        $this->middleware(T::passport->value);
         $this->middleware(function ($request, $next) {
-            if (Auth::user()->type !== 'admin') {
-                return $this->errorResponse('Accès non autorisé', 403);
+            if (Auth::user()->type !== UserType::ADMIN->value) {
+                return $this->errorResponse(MessagesErreursRequests::UNAUTHORIZED_ACCESS->value, 403);
             }
             return $next($request);
         });
@@ -31,7 +37,7 @@ class AdminController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/admin/users/pending",
+     *     path="/admin/users/pending",
      *     operationId="getPendingUsers",
      *     tags={"Administration"},
      *     summary="Récupérer les utilisateurs en attente d'approbation",
@@ -49,20 +55,16 @@ class AdminController extends Controller
      */
     public function getPendingUsers()
     {
-        try {
-            $users = User::whereIn('type', ['commercant', 'fournisseur'])
-                        ->where('statut', 'en_attente')
-                        ->get();
-
-            return $this->successResponse($users, 'Utilisateurs en attente récupérés');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
+        return $this->tryCatch(function () {
+            return User::whereIn('type', [UserType::COMMERCANT->value, UserType::FOURNISSEUR->value])
+                      ->where('statut', UserStatus::EN_ATTENTE->value)
+                      ->get();
+        }, ResponseMessage::PENDING_USERS_RETRIEVED->value);
     }
 
     /**
      * @OA\Post(
-     *     path="/api/admin/users/{id}/approve",
+     *     path="/admin/users/{id}/approve",
      *     operationId="approveUser",
      *     tags={"Administration"},
      *     summary="Approuver un utilisateur",
@@ -88,15 +90,20 @@ class AdminController extends Controller
     public function approveUser($id)
     {
         try {
+            $id = trim($id, '"');
             $user = User::findOrFail($id);
 
-            if (!in_array($user->type, ['commercant', 'fournisseur'])) {
-                return $this->errorResponse('Type d\'utilisateur non approuvable', 400);
+            if (!($user->isCommercant() || $user->isFournisseur())) {
+                return $this->errorResponse(MessagesErreursRequests::APPROVABLE_TYPE_ERROR->value, 400);
             }
 
-            $user->update(['statut' => 'actif']);
+            if ($user->statut === UserStatus::ACTIF->value) {
+                return $this->successResponse(null, ResponseMessage::USER_ALREADY_APPROVED->value);
+            }
 
-            return $this->successResponse(null, 'Utilisateur approuvé avec succès');
+            $user->update(['statut' => UserStatus::ACTIF->value]);
+
+            return $this->successResponse(null, ResponseMessage::USER_APPROVED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -104,7 +111,7 @@ class AdminController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/admin/users/{id}/reject",
+     *     path="/admin/users/{id}/reject",
      *     operationId="rejectUser",
      *     tags={"Administration"},
      *     summary="Rejeter un utilisateur",
@@ -137,20 +144,21 @@ class AdminController extends Controller
     {
         try {
             $request->validate([
-                'motif_rejet' => 'required|string|max:255'
+                MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
             ]);
 
+            $id = trim($id, '"');
             $user = User::findOrFail($id);
 
-            if (!in_array($user->type, ['commercant', 'fournisseur'])) {
-                return $this->errorResponse('Type d\'utilisateur non rejetable', 400);
+            if (!($user->isCommercant() || $user->isFournisseur())) {
+                return $this->errorResponse(MessagesErreursRequests::REJECTABLE_TYPE_ERROR->value, 400);
             }
 
-            $user->update(['statut' => 'inactif']);
+            $user->update(['statut' => UserStatus::INACTIF->value]);
 
             // TODO: Peut-être stocker le motif de rejet quelque part
 
-            return $this->successResponse(null, 'Utilisateur rejeté');
+            return $this->successResponse(null, ResponseMessage::USER_REJECTED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -158,7 +166,7 @@ class AdminController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/admin/balance-requests/pending",
+     *     path="/admin/balance-requests/pending",
      *     operationId="getPendingBalanceRequests",
      *     tags={"Administration"},
      *     summary="Récupérer les demandes de solde en attente",
@@ -181,20 +189,16 @@ class AdminController extends Controller
      */
     public function getPendingBalanceRequests()
     {
-        try {
-            $requests = BalanceRequest::with('supplier')
-                                    ->where('statut', 'en_attente')
-                                    ->get();
-
-            return $this->successResponse($requests, 'Demandes de solde en attente récupérées');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
+        return $this->tryCatch(function () {
+            return BalanceRequest::with('supplier')
+                               ->where('statut', BalanceRequestStatus::EN_ATTENTE->value)
+                               ->get();
+        }, ResponseMessage::PENDING_BALANCE_REQUESTS_RETRIEVED->value);
     }
 
     /**
      * @OA\Post(
-     *     path="/api/admin/balance-requests/{id}/approve",
+     *     path="/admin/balance-requests/{id}/approve",
      *     operationId="approveBalanceRequest",
      *     tags={"Administration"},
      *     summary="Approuver une demande de solde",
@@ -220,10 +224,11 @@ class AdminController extends Controller
     public function approveBalanceRequest($id)
     {
         try {
+            $id = trim($id, '"');
             $request = BalanceRequest::findOrFail($id);
 
             $request->update([
-                'statut' => 'approuvee',
+                'statut' => BalanceRequestStatus::APPROUVEE->value,
                 'admin_id' => Auth::id(),
                 'traitee_at' => now()
             ]);
@@ -233,10 +238,10 @@ class AdminController extends Controller
             if ($supplier && $supplier->comptes->count() > 0) {
                 $compte = $supplier->comptes->first();
                 \App\Models\Transaction::create([
-                    'type' => 'depot',
+                    'type' => TransactionType::DEPOT->value,
                     'montant' => $request->montant,
                     'reference' => 'DEP-APPROVAL-' . strtoupper(uniqid()),
-                    'statut' => 'reussie',
+                    'statut' => TransactionStatus::REUSSIE->value,
                     'note' => 'Approbation de demande de solde',
                     'compte_emetteur_id' => null,
                     'compte_recepteur_id' => $compte->id,
@@ -244,7 +249,7 @@ class AdminController extends Controller
                 ]);
             }
 
-            return $this->successResponse(null, 'Demande de solde approuvée');
+            return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_APPROVED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -252,7 +257,7 @@ class AdminController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/admin/balance-requests/{id}/reject",
+     *     path="/admin/balance-requests/{id}/reject",
      *     operationId="rejectBalanceRequest",
      *     tags={"Administration"},
      *     summary="Rejeter une demande de solde",
@@ -285,19 +290,20 @@ class AdminController extends Controller
     {
         try {
             $request->validate([
-                'motif_rejet' => 'required|string|max:255'
+                MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
             ]);
 
+            $id = trim($id, '"');
             $balanceRequest = BalanceRequest::findOrFail($id);
 
             $balanceRequest->update([
-                'statut' => 'rejetee',
+                'statut' => BalanceRequestStatus::REJETEE->value,
                 'motif_rejet' => $request->motif_rejet,
                 'admin_id' => Auth::id(),
                 'traitee_at' => now()
             ]);
 
-            return $this->successResponse(null, 'Demande de solde rejetée');
+            return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_REJECTED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -305,7 +311,7 @@ class AdminController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/api/admin/deposit",
+     *     path="/admin/deposit",
      *     operationId="adminDeposit",
      *     tags={"Administration"},
      *     summary="Effectuer un dépôt sur le compte d'un client par numéro de téléphone",
@@ -335,15 +341,15 @@ class AdminController extends Controller
     {
         try {
             $data = $request->validate([
-                'telephone' => 'required|string',
-                'montant' => 'required|numeric|min:0.01',
-                'note' => 'nullable|string',
+                MessagesErreursRequests::VALIDATION_TELEPHONE->value => MessagesErreursRequests::VALIDATION_TELEPHONE_RULES->value,
+                MessagesErreursRequests::VALIDATION_MONTANT->value => 'required|numeric|min:0.01',
+                MessagesErreursRequests::VALIDATION_NOTE->value => MessagesErreursRequests::VALIDATION_NOTE_RULES->value,
             ]);
 
             // Trouver le client par téléphone
             $client = User::where('telephone', $data['telephone'])
-                         ->where('type', 'client')
-                         ->first();
+                          ->where('type', UserType::CLIENT->value)
+                          ->first();
 
             if (!$client) {
                 return $this->errorResponse('Client non trouvé', 404);
@@ -357,17 +363,17 @@ class AdminController extends Controller
 
             // Créer la transaction de dépôt
             \App\Models\Transaction::create([
-                'type' => 'depot',
+                'type' => TransactionType::DEPOT->value,
                 'montant' => $data['montant'],
                 'reference' => 'DEP-ADMIN-' . strtoupper(uniqid()),
-                'statut' => 'reussie',
+                'statut' => TransactionStatus::REUSSIE->value,
                 'note' => $data['note'] ?? 'Dépôt effectué par l\'admin',
                 'compte_emetteur_id' => null,
                 'compte_recepteur_id' => $compte->id,
                 'date_transaction' => now(),
             ]);
 
-            return $this->respondCreated(null, 'Dépôt effectué avec succès');
+            return $this->respondCreated(null, ResponseMessage::DEPOSIT_SUCCESS->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }

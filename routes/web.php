@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\MailController;
+use App\Http\Controllers\CampaignController;
 
 /*
 |--------------------------------------------------------------------------
@@ -16,3 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
+
+Route::get('/send-mail', [MailController::class, 'send']);
+Route::get('/create-campaign', [CampaignController::class, 'create']);
+Route::post('/send-campaign', [CampaignController::class, 'sendNow']);
