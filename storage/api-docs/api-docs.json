@@ -2479,7 +2479,7 @@
                     "Transactions"
                 ],
                 "summary": "Effectuer un dépôt sur le compte d'un client",
-                "description": "Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients. Les fournisseurs doivent fournir leur PIN pour plus de sécurité.",
+                "description": "Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients.",
                 "operationId": "POST::/transactions/depot::App\\Http\\Controllers\\TransactionController::store",
                 "requestBody": {
                     "required": true,
@@ -2501,11 +2501,6 @@
                                         "description": "Numéro de téléphone du destinataire",
                                         "type": "string",
                                         "example": "771234567"
-                                    },
-                                    "pin": {
-                                        "description": "PIN du fournisseur (requis pour les fournisseurs)",
-                                        "type": "string",
-                                        "example": "1234"
                                     },
                                     "note": {
                                         "type": "string",
@@ -2529,7 +2524,7 @@
                         }
                     },
                     "403": {
-                        "description": "PIN incorrect ou accès non autorisé"
+                        "description": "Accès non autorisé"
                     },
                     "404": {
                         "description": "Utilisateur destinataire non trouvé"

@@ -294,7 +294,7 @@ class TransactionController extends Controller
       *     path="/transactions/depot",
       *     tags={"Transactions"},
       *     summary="Effectuer un dépôt sur le compte d'un client",
-      *     description="Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients. Les fournisseurs doivent fournir leur PIN pour plus de sécurité.",
+      *     description="Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients.",
       *     security={{"bearerAuth":{}}},
       *     @OA\RequestBody(
       *         required=true,
@@ -302,7 +302,6 @@ class TransactionController extends Controller
       *             required={"montant","telephone_recepteur_id"},
       *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant du dépôt"),
       *             @OA\Property(property="telephone_recepteur_id", type="string", example="771234567", description="Numéro de téléphone du destinataire"),
-      *             @OA\Property(property="pin", type="string", example="1234", description="PIN du fournisseur (requis pour les fournisseurs)"),
       *             @OA\Property(property="note", type="string", example="Dépôt client")
       *         )
       *     ),
@@ -311,7 +310,7 @@ class TransactionController extends Controller
       *         description="Dépôt effectué avec succès",
       *         @OA\JsonContent(ref="#/components/schemas/Transaction")
       *     ),
-      *     @OA\Response(response=403, description="PIN incorrect ou accès non autorisé"),
+      *     @OA\Response(response=403, description="Accès non autorisé"),
       *     @OA\Response(response=404, description="Utilisateur destinataire non trouvé")
       * )
       */
@@ -652,17 +651,6 @@ class TransactionController extends Controller
                 'note' => 'nullable|string',
             ]);
 
-            // Validation supplémentaire pour les fournisseurs
-            if ($authenticatedUser->isFournisseur()) {
-                $request->validate([
-                    'pin' => 'required|string|size:4',
-                ]);
-
-                // Vérifier le PIN du fournisseur
-                if (!$authenticatedUser->pin || !\Illuminate\Support\Facades\Hash::check($request->pin, $authenticatedUser->pin)) {
-                    return $this->errorResponse('PIN incorrect', 403);
-                }
-            }
 
             // Trouver le compte récepteur par numéro de téléphone
             $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
@@ -674,9 +662,19 @@ class TransactionController extends Controller
                 return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur destinataire', 404);
             }
 
-            // Pour un dépôt, l'émetteur est null (système/admin) ou le fournisseur authentifié
+            $compteEmetteur = $authenticatedUser->comptes->first();
+            if (!$compteEmetteur) {
+                return $this->errorResponse('Aucun compte trouvé pour le fournisseur', 404);
+            }
+
+            // Vérifier le solde du fournisseur
+            if ($compteEmetteur->solde < $data['montant']) {
+                return $this->errorResponse('Solde insuffisant pour effectuer ce dépôt', 400);
+            }
+
+            // Pour un dépôt, l'émetteur est le fournisseur authentifié
             $data['type'] = 'depot';
-            $data['compte_emetteur_id'] = null; // Système pour dépôt
+            $data['compte_emetteur_id'] = $compteEmetteur->id; // Fournisseur
             $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'DEP-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
@@ -905,44 +903,84 @@ class TransactionController extends Controller
         }
     }
 
-    protected function sendInsufficientBalanceEmails(User $client, User $fournisseur, float $montant): void
+    protected function sendTransactionErrorEmails(User $sender, User $receiver, float $montant, string $errorMessage): void
     {
         try {
-            \Illuminate\Support\Facades\Log::info('Envoi d\'emails d\'erreur solde insuffisant', [
-                'client_email' => $client->email,
-                'fournisseur_email' => $fournisseur->email,
-                'montant' => $montant
+            \Illuminate\Support\Facades\Log::info('Envoi d\'emails d\'erreur de transaction', [
+                'sender_email' => $sender->email,
+                'receiver_email' => $receiver->email,
+                'montant' => $montant,
+                'error' => $errorMessage
             ]);
 
-            // Email au client
-            if ($client->email) {
-                $subject = "Tentative de retrait - Solde insuffisant";
-                $message = "Une tentative de retrait de {$montant} FCFA a échoué en raison d'un solde insuffisant. Veuillez consulter votre solde.";
+            // Email à l'émetteur
+            if ($sender->email) {
+                $subject = "Échec de transaction - {$errorMessage}";
+                $message = "Votre tentative de transaction de {$montant} FCFA a échoué : {$errorMessage}. Veuillez vérifier vos informations et réessayer.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => null,
                     'message' => $message,
                     'role' => 'error'
                 ])->render();
-                $result = $this->brevoService->sendMail($client->email, $subject, $htmlContent);
-                \Illuminate\Support\Facades\Log::info('Email envoyé au client', ['email' => $client->email, 'result' => $result]);
+                $result = $this->brevoService->sendMail($sender->email, $subject, $htmlContent);
+                \Illuminate\Support\Facades\Log::info('Email d\'erreur envoyé à l\'émetteur', ['email' => $sender->email, 'result' => $result]);
             }
 
-            // Email au fournisseur
-            if ($fournisseur->email) {
-                $subject = "Tentative de retrait - Solde insuffisant";
-                $message = "La tentative de retrait de {$montant} FCFA pour le client {$client->nom} {$client->prenom} a échoué en raison d'un solde insuffisant.";
+            // Email au destinataire
+            if ($receiver->email) {
+                $subject = "Notification d'échec de transaction";
+                $message = "Une transaction de {$montant} FCFA initiée vers vous a échoué : {$errorMessage}.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => null,
                     'message' => $message,
                     'role' => 'error'
                 ])->render();
-                $result = $this->brevoService->sendMail($fournisseur->email, $subject, $htmlContent);
-                \Illuminate\Support\Facades\Log::info('Email envoyé au fournisseur', ['email' => $fournisseur->email, 'result' => $result]);
+                $result = $this->brevoService->sendMail($receiver->email, $subject, $htmlContent);
+                \Illuminate\Support\Facades\Log::info('Email d\'erreur envoyé au destinataire', ['email' => $receiver->email, 'result' => $result]);
             }
         } catch (\Exception $e) {
             // Log l'erreur mais ne pas interrompre la réponse
-            \Illuminate\Support\Facades\Log::error('Erreur lors de l\'envoi d\'emails d\'erreur de solde insuffisant: ' . $e->getMessage());
+            \Illuminate\Support\Facades\Log::error('Erreur lors de l\'envoi d\'emails d\'erreur de transaction: ' . $e->getMessage());
         }
+    }
+
+    protected function sendTransactionSuccessEmails(User $sender, User $receiver, $transaction, string $typeTransaction): void
+    {
+        try {
+            // Email au destinataire (client)
+            if ($receiver->email) {
+                $newBalance = $receiver->comptes->first()->solde ?? 0;
+                $subject = "Transaction reçue - {$transaction->reference}";
+                $message = "Vous avez reçu une transaction de {$transaction->montant} FCFA de {$sender->nom} {$sender->prenom}. Nouveau solde : {$newBalance} FCFA.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => $transaction,
+                    'message' => $message,
+                    'role' => 'receiver'
+                ])->render();
+                $this->brevoService->sendMail($receiver->email, $subject, $htmlContent);
+            }
+
+            // Email au fournisseur (émetteur)
+            if ($sender->email) {
+                $currentBalance = $sender->comptes->first()->solde ?? 0;
+                $subject = "Transaction effectuée - {$transaction->reference}";
+                $message = "Votre transaction de {$transaction->montant} FCFA vers {$receiver->nom} {$receiver->prenom} a été effectuée avec succès. Solde actuel : {$currentBalance} FCFA.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => $transaction,
+                    'message' => $message,
+                    'role' => 'sender'
+                ])->render();
+                $this->brevoService->sendMail($sender->email, $subject, $htmlContent);
+            }
+        } catch (\Exception $e) {
+            // Log l'erreur mais ne pas interrompre la réponse
+            \Illuminate\Support\Facades\Log::error('Erreur lors de l\'envoi d\'emails de succès de transaction: ' . $e->getMessage());
+        }
+    }
+
+    protected function sendInsufficientBalanceEmails(User $client, User $fournisseur, float $montant): void
+    {
+        $this->sendTransactionErrorEmails($client, $fournisseur, $montant, 'Solde insuffisant');
     }
 
     protected function sendRetraitConfirmationEmails(Transaction $transaction, User $fournisseur): void
@@ -1269,30 +1307,30 @@ class TransactionController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/transactions/unified",
-     *     tags={"Transactions"},
-     *     summary="Transaction unifiée intelligente - Détection automatique du type selon l'émetteur et le destinataire",
-     *     description="Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur est toujours l'utilisateur connecté. La note est générée automatiquement.",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"montant","telephone_recepteur"},
-     *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de la transaction"),
-     *             @OA\Property(property="telephone_recepteur", type="string", example="771234567", description="Numéro de téléphone du destinataire")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Transaction effectuée avec succès",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=400, description="Solde insuffisant ou comptes invalides"),
-     *     @OA\Response(response=403, description="Droits insuffisants"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
+      * @OA\Post(
+      *     path="/transactions/unified",
+      *     tags={"Transactions"},
+      *     summary="Transaction unifiée intelligente - Détection automatique du type selon l'émetteur et le destinataire",
+      *     description="Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur est toujours l'utilisateur connecté. La note est générée automatiquement.",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\RequestBody(
+      *         required=true,
+      *         @OA\JsonContent(
+      *             required={"montant","telephone_recepteur"},
+      *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de la transaction"),
+      *             @OA\Property(property="telephone_recepteur", type="string", example="771234567", description="Numéro de téléphone du destinataire")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=201,
+      *         description="Transaction effectuée avec succès",
+      *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+      *     ),
+      *     @OA\Response(response=400, description="Solde insuffisant ou comptes invalides"),
+      *     @OA\Response(response=403, description="Droits insuffisants"),
+      *     @OA\Response(response=404, description="Utilisateur non trouvé")
+      * )
+      */
     public function unifiedTransaction(Request $request)
     {
         try {
@@ -1304,6 +1342,7 @@ class TransactionController extends Controller
                 'montant' => 'required|numeric|min:0.01',
                 'telephone_recepteur' => 'required|string|exists:users,telephone',
             ]);
+
 
             // L'émetteur est toujours l'utilisateur connecté
             $telephoneEmetteur = $authenticatedUser->telephone;
@@ -1394,12 +1433,10 @@ class TransactionController extends Controller
             }
 
             // Vérifier le solde pour les transactions qui débitent un compte
-            if ($typeTransaction !== 'depot') {
-                if ($compteEmetteur->solde < $montantTotal) {
-                    // Envoyer des emails d'erreur aux deux parties
-                    $this->sendTransactionErrorEmails($userEmetteur, $userRecepteur, $data['montant'], 'Solde insuffisant pour effectuer cette transaction');
-                    return $this->errorResponse('Solde insuffisant pour effectuer cette transaction', 400);
-                }
+            if ($compteEmetteur->solde < $montantTotal) {
+                // Envoyer des emails d'erreur aux deux parties
+                $this->sendTransactionErrorEmails($userEmetteur, $userRecepteur, $data['montant'], 'Solde insuffisant pour effectuer cette transaction');
+                return $this->errorResponse('Solde insuffisant pour effectuer cette transaction', 400);
             }
 
             // Vérifier que les comptes sont différents
@@ -1420,8 +1457,8 @@ class TransactionController extends Controller
 
             // Ajustements selon le type
             if ($typeTransaction === 'depot') {
-                $transactionData['compte_emetteur_id'] = null; // Système pour dépôt
                 $transactionData['reference'] = 'DEP-' . strtoupper(uniqid());
+                // Pour dépôt fournisseur->client, l'émetteur est le fournisseur
             } elseif ($typeTransaction === 'transfert') {
                 $transactionData['reference'] = 'TRF-' . strtoupper(uniqid());
             } elseif ($typeTransaction === 'paiement') {
@@ -1431,6 +1468,9 @@ class TransactionController extends Controller
             }
 
             $transaction = $this->transactionService->create($transactionData);
+
+            // Envoyer des emails de confirmation aux deux parties
+            $this->sendTransactionSuccessEmails($userEmetteur, $userRecepteur, $transaction, $typeTransaction);
 
             $message = match($typeTransaction) {
                 'depot' => 'Dépôt effectué avec succès',
