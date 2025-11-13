@@ -14,12 +14,17 @@ class UserObserver
      */
     public function created(User $user)
     {
-        // Crée automatiquement un compte pour le nouvel utilisateur
+        // Crée automatiquement le premier compte pour le nouvel utilisateur
         Compte::create([
             'numero_compte' => GeneratesCompteNumber::generateNumeroCompte($user->nom, $user->prenom),
             'titulaire' => $user->nom . ' ' . $user->prenom,
-            'statut' => 'actif',
+            'nom_compte' => 'compte principal', // Premier compte = compte principal
+            'statut' => 'actif', // Premier compte = actif
             'utilisateur_id' => $user->id,
+            'solde' => 0, // Solde initial à 0
+            'client_id' => $user->id, // Utilise l'ID utilisateur comme client_id
+            'type_compte' => 'courant', // Type par défaut
+            'devise' => 'XOF', // Devise par défaut
         ]);
     }
 

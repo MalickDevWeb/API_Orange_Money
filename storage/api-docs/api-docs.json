@@ -359,11 +359,115 @@
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Lister tous les comptes de l'utilisateur connecté",
+                "summary": "Lister tous les comptes avec filtrage avancé (Admin uniquement)",
+                "description": "Liste paginée de tous les comptes avec possibilité de filtrer par statut, solde, numéro de compte, titulaire et recherche globale. Tri possible par tous les champs principaux.",
                 "operationId": "getComptes",
+                "parameters": [
+                    {
+                        "name": "statut",
+                        "in": "query",
+                        "description": "Filtrer par statut",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "actif",
+                                "inactif",
+                                "suspendu"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "solde_min",
+                        "in": "query",
+                        "description": "Solde minimum",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float"
+                        }
+                    },
+                    {
+                        "name": "solde_max",
+                        "in": "query",
+                        "description": "Solde maximum",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float"
+                        }
+                    },
+                    {
+                        "name": "numero_compte",
+                        "in": "query",
+                        "description": "Rechercher par numéro de compte",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "titulaire",
+                        "in": "query",
+                        "description": "Rechercher par titulaire",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Recherche globale dans numéro, titulaire et code marchand",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "description": "Champ de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "created_at",
+                                "updated_at",
+                                "numero_compte",
+                                "solde",
+                                "statut"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort_direction",
+                        "in": "query",
+                        "description": "Direction du tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page (1-100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Liste des comptes récupérée",
+                        "description": "Liste des comptes récupérée avec filtrage et pagination",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -377,10 +481,48 @@
                                             "example": "Comptes récupérés avec succès"
                                         },
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "$ref": "#/components/schemas/Compte"
-                                            }
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "numero_compte": {
+                                                                "type": "string",
+                                                                "example": "CMPT-001"
+                                                            },
+                                                            "titulaire": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "solde": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 15000.5
+                                                            },
+                                                            "statut": {
+                                                                "type": "string",
+                                                                "example": "actif"
+                                                            },
+                                                            "code_marchand": {
+                                                                "type": "string",
+                                                                "example": "MRC001",
+                                                                "nullable": true
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -388,8 +530,8 @@
                             }
                         }
                     },
-                    "401": {
-                        "description": "Non autorisé"
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
                     }
                 },
                 "security": [
@@ -402,39 +544,23 @@
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Créer un nouveau compte",
+                "summary": "Créer un compte secondaire",
+                "description": "Création de comptes secondaires pour utilisateurs existants. Le premier compte 'compte principal' est créé automatiquement lors de l'inscription.",
                 "operationId": "POST::/comptes::App\\Http\\Controllers\\CompteController::store",
                 "requestBody": {
+                    "description": "Seul le nom du compte est requis. Tous les autres champs (numéro, solde, devise, etc.) sont auto-générés.",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "numero_compte",
-                                    "titulaire",
-                                    "statut"
+                                    "nom_compte"
                                 ],
                                 "properties": {
-                                    "numero_compte": {
+                                    "nom_compte": {
+                                        "description": "Nom unique du compte secondaire (différent de 'compte principal')",
                                         "type": "string",
-                                        "example": "CMPT-001"
-                                    },
-                                    "titulaire": {
-                                        "type": "string",
-                                        "example": "John Doe"
-                                    },
-                                    "code_marchand": {
-                                        "type": "string",
-                                        "example": "MRC001"
-                                    },
-                                    "statut": {
-                                        "type": "string",
-                                        "enum": [
-                                            "actif",
-                                            "inactif",
-                                            "suspendu"
-                                        ],
-                                        "example": "actif"
+                                        "example": "compteprive"
                                     }
                                 },
                                 "type": "object"
@@ -444,7 +570,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Compte créé avec succès",
+                        "description": "Compte secondaire créé avec succès (statut inactif par défaut)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -453,8 +579,11 @@
                             }
                         }
                     },
-                    "422": {
-                        "description": "Données invalides"
+                    "400": {
+                        "description": "Nom de compte déjà utilisé ou réservé"
+                    },
+                    "403": {
+                        "description": "Administrateur ne peut avoir qu'un compte"
                     }
                 },
                 "security": [
@@ -573,7 +702,7 @@
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Supprimer un compte (soft delete)",
+                "summary": "Demander la suppression d'un compte (génère un code de confirmation)",
                 "operationId": "DELETE::/comptes/{compte}::App\\Http\\Controllers\\CompteController::destroy",
                 "parameters": [
                     {
@@ -586,15 +715,129 @@
                         }
                     }
                 ],
+                "responses": {
+                    "200": {
+                        "description": "Code de confirmation généré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Code de confirmation envoyé. Utilisez ce code pour confirmer la suppression."
+                                        },
+                                        "code_sent": {
+                                            "type": "boolean",
+                                            "example": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Solde positif ou compte déjà en cours de suppression"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/balance": {
+            "get": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Consulter le solde du compte actif",
+                "description": "Endpoint commun pour tous les utilisateurs authentifiés permettant de consulter le solde de leur compte actif (compte principal).",
+                "operationId": "GET::/balance::App\\Http\\Controllers\\CompteController::solde",
+                "responses": {
+                    "200": {
+                        "description": "Solde récupéré avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Solde récupéré avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "solde": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 15000.5
+                                                },
+                                                "numero_compte": {
+                                                    "type": "string",
+                                                    "example": "CMPT-001"
+                                                },
+                                                "nom_compte": {
+                                                    "type": "string",
+                                                    "example": "compte principal"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Aucun compte actif trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/comptes/activate/{nom_compte}": {},
+        "/comptes/confirm-delete": {
+            "post": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Confirmer la suppression d'un compte avec le code de confirmation",
+                "operationId": "POST::/comptes/confirm-delete::App\\Http\\Controllers\\CompteController::confirmDelete",
                 "requestBody": {
+                    "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
+                                "required": [
+                                    "confirmation_code",
+                                    "compte_id"
+                                ],
                                 "properties": {
-                                    "otp_code": {
-                                        "description": "Code OTP requis pour supprimer un compte actif",
+                                    "confirmation_code": {
+                                        "description": "Code de confirmation à 6 chiffres",
                                         "type": "string",
                                         "example": "123456"
+                                    },
+                                    "compte_id": {
+                                        "description": "ID du compte à supprimer",
+                                        "type": "string",
+                                        "example": "uuid-compte"
                                     }
                                 },
                                 "type": "object"
@@ -604,7 +847,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "Compte supprimé",
+                        "description": "Compte supprimé avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -619,8 +862,11 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "Code invalide, expiré ou ne correspond pas au compte"
+                    },
                     "404": {
-                        "description": "Compte non trouvé"
+                        "description": "Code ou compte non trouvé"
                     }
                 },
                 "security": [
@@ -635,96 +881,232 @@
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Lister toutes les transactions",
+                "summary": "Lister toutes les transactions avec filtrage avancé",
+                "description": "Liste paginée des transactions avec possibilité de filtrer par type, statut, montant, référence, dates et recherche dans les notes. Tri possible par tous les champs principaux.",
                 "operationId": "GET::/transactions::App\\Http\\Controllers\\TransactionController::index",
-                "responses": {
-                    "200": {
-                        "description": "Liste des transactions récupérée",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/Transaction"
-                                    }
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
+                "parameters": [
                     {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Créer une nouvelle transaction",
-                "operationId": "POST::/transactions::App\\Http\\Controllers\\TransactionController::store",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "type",
-                                    "montant"
-                                ],
-                                "properties": {
-                                    "type": {
-                                        "type": "string",
-                                        "enum": [
-                                            "depot",
-                                            "retrait",
-                                            "transfert",
-                                            "paiement",
-                                            "achat_virtuel"
-                                        ],
-                                        "example": "transfert"
-                                    },
-                                    "montant": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 50000
-                                    },
-                                    "reference": {
-                                        "type": "string",
-                                        "example": "TXN-123456"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Paiement de facture"
-                                    },
-                                    "telephone_emetteur_id": {
-                                        "type": "string",
-                                        "example": "771234567"
-                                    },
-                                    "telephone_recepteur_id": {
-                                        "type": "string",
-                                        "example": "771234568"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Transaction créée avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Transaction"
-                                }
-                            }
+                        "name": "type",
+                        "in": "query",
+                        "description": "Filtrer par type de transaction",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "depot",
+                                "retrait",
+                                "transfert",
+                                "paiement",
+                                "achat_virtuel"
+                            ]
                         }
                     },
-                    "422": {
-                        "description": "Données invalides"
+                    {
+                        "name": "statut",
+                        "in": "query",
+                        "description": "Filtrer par statut",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "reussie",
+                                "echouee",
+                                "annulee"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "montant_min",
+                        "in": "query",
+                        "description": "Montant minimum",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float"
+                        }
+                    },
+                    {
+                        "name": "montant_max",
+                        "in": "query",
+                        "description": "Montant maximum",
+                        "required": false,
+                        "schema": {
+                            "type": "number",
+                            "format": "float"
+                        }
+                    },
+                    {
+                        "name": "date_debut",
+                        "in": "query",
+                        "description": "Date de début (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "date_fin",
+                        "in": "query",
+                        "description": "Date de fin (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "reference",
+                        "in": "query",
+                        "description": "Rechercher par référence",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Recherche dans les notes et références",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "description": "Champ de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "created_at",
+                                "updated_at",
+                                "montant",
+                                "type",
+                                "statut",
+                                "date_transaction",
+                                "reference",
+                                "frais"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort_direction",
+                        "in": "query",
+                        "description": "Direction du tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page (1-100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Liste des transactions récupérée avec filtrage et pagination",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Transactions récupérées avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "type": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "depot",
+                                                                    "retrait",
+                                                                    "transfert",
+                                                                    "paiement",
+                                                                    "achat_virtuel"
+                                                                ],
+                                                                "example": "transfert"
+                                                            },
+                                                            "montant": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 50000
+                                                            },
+                                                            "frais": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 7.5
+                                                            },
+                                                            "reference": {
+                                                                "type": "string",
+                                                                "example": "TXN-123456"
+                                                            },
+                                                            "statut": {
+                                                                "type": "string",
+                                                                "enum": [
+                                                                    "reussie",
+                                                                    "echouee",
+                                                                    "annulee"
+                                                                ],
+                                                                "example": "reussie"
+                                                            },
+                                                            "note": {
+                                                                "type": "string",
+                                                                "example": "Paiement de facture"
+                                                            },
+                                                            "numero_envoyer": {
+                                                                "type": "string",
+                                                                "example": "771234567",
+                                                                "nullable": true
+                                                            },
+                                                            "numero_recepteur": {
+                                                                "type": "string",
+                                                                "example": "771234568",
+                                                                "nullable": true
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -874,61 +1256,6 @@
                 ]
             }
         },
-        "/transactions/depot": {
-            "post": {
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Effectuer un dépôt sur un compte",
-                "operationId": "POST::/transactions/depot::App\\Http\\Controllers\\TransactionController::depot",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "montant",
-                                    "telephone_recepteur"
-                                ],
-                                "properties": {
-                                    "montant": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 50000
-                                    },
-                                    "telephone_recepteur": {
-                                        "type": "string",
-                                        "example": "771234567"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Dépôt d'argent"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Dépôt effectué avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Transaction"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/transactions/retrait": {
             "post": {
                 "tags": [
@@ -987,13 +1314,14 @@
                 ]
             }
         },
-        "/transactions/transfert": {
+        "/transactions/unified": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Effectuer un transfert vers un autre client",
-                "operationId": "POST::/transactions/transfert::App\\Http\\Controllers\\TransactionController::transfert",
+                "summary": "Transaction unifiée intelligente - Détection automatique du type selon l'émetteur et le destinataire",
+                "description": "Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur par défaut est l'utilisateur connecté, mais peut être spécifié.",
+                "operationId": "POST::/transactions/unified::App\\Http\\Controllers\\TransactionController::unifiedTransaction",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -1001,26 +1329,28 @@
                             "schema": {
                                 "required": [
                                     "montant",
-                                    "telephone_emetteur_id",
-                                    "telephone_recepteur_id"
+                                    "telephone_recepteur"
                                 ],
                                 "properties": {
                                     "montant": {
+                                        "description": "Montant de la transaction",
                                         "type": "number",
                                         "format": "float",
-                                        "example": 30000
+                                        "example": 50000
                                     },
-                                    "telephone_emetteur_id": {
+                                    "telephone_recepteur": {
+                                        "description": "Numéro de téléphone du destinataire",
                                         "type": "string",
                                         "example": "771234567"
                                     },
-                                    "telephone_recepteur_id": {
+                                    "telephone_emetteur": {
+                                        "description": "Numéro de téléphone de l'émetteur (optionnel, par défaut utilisateur connecté)",
                                         "type": "string",
                                         "example": "771234568"
                                     },
                                     "note": {
                                         "type": "string",
-                                        "example": "Transfert d'argent"
+                                        "example": "Transaction unifiée"
                                     }
                                 },
                                 "type": "object"
@@ -1030,7 +1360,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Transfert effectué avec succès",
+                        "description": "Transaction effectuée avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1040,73 +1370,13 @@
                         }
                     },
                     "400": {
-                        "description": "Solde insuffisant"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/transactions/paiement": {
-            "post": {
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Effectuer un paiement (client vers commerçant)",
-                "operationId": "POST::/transactions/paiement::App\\Http\\Controllers\\TransactionController::paiement",
-                "requestBody": {
-                    "description": "Pour effectuer un paiement, vous devez fournir soit le code_marchand soit le telephone_marchand, mais pas les deux en même temps. L'émetteur est automatiquement l'utilisateur connecté. Les paiements par numéro de téléphone incluent des frais de 0.5%.",
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "montant"
-                                ],
-                                "properties": {
-                                    "montant": {
-                                        "description": "Montant du paiement",
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 15000
-                                    },
-                                    "code_marchand": {
-                                        "description": "Code unique du marchand (paiement sans frais supplémentaires)",
-                                        "type": "string",
-                                        "example": "MARCHAND123"
-                                    },
-                                    "telephone_marchand": {
-                                        "description": "Numéro de téléphone du marchand (paiement avec frais de 0.5%)",
-                                        "type": "string",
-                                        "example": "771234568"
-                                    },
-                                    "note": {
-                                        "description": "Note optionnelle",
-                                        "type": "string",
-                                        "example": "Paiement de produit"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Paiement effectué avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Transaction"
-                                }
-                            }
-                        }
+                        "description": "Solde insuffisant ou comptes invalides"
                     },
-                    "400": {
-                        "description": "Solde insuffisant"
+                    "403": {
+                        "description": "Droits insuffisants"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
                     }
                 },
                 "security": [
@@ -1527,6 +1797,351 @@
                 ]
             }
         },
+        "/api/admin/users/{user}/rights": {
+            "put": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Modifier les droits de transfert d'un utilisateur",
+                "description": "Permet à l'administrateur de définir les autorisations de transfert pour un utilisateur spécifique. Toutes les modifications sont automatiquement appliquées lors des futures transactions.",
+                "operationId": "updateUserRights",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "ID de l'utilisateur",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/UserRights"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Droits mis à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Droits de transfert mis à jour"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/users/{user}/ban": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Bannir un utilisateur",
+                "description": "Bloque définitivement l'accès aux transactions pour cet utilisateur. Toutes les tentatives de transaction seront rejetées.",
+                "operationId": "banUser",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "ID de l'utilisateur à bannir",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur banni avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Utilisateur banni"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/users/{user}/unban": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Débannir un utilisateur",
+                "description": "Restaure l'accès aux transactions pour un utilisateur précédemment banni.",
+                "operationId": "unbanUser",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "ID de l'utilisateur à débannir",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Utilisateur débanni avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Utilisateur débanni"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/statistics/daily": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Obtenir les statistiques journalières des transactions",
+                "description": "Retourne le nombre de transactions réussies par type pour la journée en cours.",
+                "operationId": "getDailyStatistics",
+                "responses": {
+                    "200": {
+                        "description": "Statistiques récupérées avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/DailyStatistics"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/fees/global": {
+            "put": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Mettre à jour les frais et pourcentages globaux",
+                "description": "Configure les frais de transaction globaux et le pourcentage appliqué aux paiements marchands. Ces paramètres affectent automatiquement toutes les futures transactions.",
+                "operationId": "updateGlobalFees",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/GlobalFees"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Frais globaux mis à jour avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Frais globaux mis à jour"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/admin/users/{user}/tax": {
+            "put": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Définir la taxe spécifique d'un utilisateur",
+                "description": "Applique une taxe personnalisée à un utilisateur. Cette taxe sera automatiquement ajoutée à tous ses paiements marchands en plus des frais globaux.",
+                "operationId": "setUserTax",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "ID de l'utilisateur",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "tax_percentage": {
+                                        "description": "Pourcentage de taxe à appliquer (0-100%)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "maximum": 100,
+                                        "minimum": 0,
+                                        "example": 2.5
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Taxe utilisateur définie avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Taxe utilisateur définie"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    },
+                    "422": {
+                        "description": "Pourcentage invalide"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/logout/otp": {
             "get": {
                 "tags": [
@@ -1647,6 +2262,7 @@
                     "Comptes"
                 ],
                 "summary": "Afficher les comptes de l'utilisateur connecté",
+                "description": "Pour les utilisateurs non-administrateurs, le compte actif apparaît en premier dans la liste. Pour les administrateurs, tous les comptes sont affichés sans ordre particulier.",
                 "operationId": "GET::/comptes/me::App\\Http\\Controllers\\CompteController::me",
                 "parameters": [
                     {
@@ -1672,7 +2288,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Votre compte actif récupéré avec succès"
+                                            "example": "Vos comptes récupérés avec succès"
                                         },
                                         "data": {
                                             "type": "array",
@@ -1805,6 +2421,91 @@
                 ]
             }
         },
+        "/api/transactions": {
+            "post": {
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Créer une nouvelle transaction avec contrôles administratifs",
+                "description": "Crée une transaction en appliquant automatiquement les contrôles administratifs : vérification des droits utilisateur, bannissement, taxes personnalisées, et frais globaux.",
+                "operationId": "POST::/api/transactions::App\\Http\\Controllers\\TransactionController::store",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "type",
+                                    "montant"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "enum": [
+                                            "depot",
+                                            "retrait",
+                                            "transfert",
+                                            "paiement",
+                                            "achat_virtuel"
+                                        ],
+                                        "example": "transfert"
+                                    },
+                                    "montant": {
+                                        "description": "Montant de base (hors frais et taxes)",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 50000
+                                    },
+                                    "reference": {
+                                        "type": "string",
+                                        "example": "TXN-123456"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "Paiement de facture"
+                                    },
+                                    "telephone_emetteur_id": {
+                                        "type": "string",
+                                        "example": "771234567"
+                                    },
+                                    "telephone_recepteur_id": {
+                                        "type": "string",
+                                        "example": "771234568"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Transaction créée avec succès (contrôles admin appliqués)",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Transaction"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Transaction refusée - Droits insuffisants ou compte banni"
+                    },
+                    "400": {
+                        "description": "Solde insuffisant (incluant frais et taxes)"
+                    },
+                    "422": {
+                        "description": "Données invalides"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/transactions/achat-virtuel": {
             "post": {
                 "tags": [
@@ -1920,6 +2621,68 @@
     },
     "components": {
         "schemas": {
+            "UserRights": {
+                "properties": {
+                    "transfer_enabled": {
+                        "description": "Autorisation générale de transfert",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_transfer_to_client": {
+                        "description": "Autorisation de transfert vers clients",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "can_pay_merchant": {
+                        "description": "Autorisation de paiement vers marchands",
+                        "type": "boolean",
+                        "example": true
+                    }
+                },
+                "type": "object"
+            },
+            "GlobalFees": {
+                "properties": {
+                    "transaction_fee": {
+                        "description": "Frais de transaction globaux",
+                        "type": "number",
+                        "format": "float",
+                        "example": 100.5
+                    },
+                    "merchant_percentage": {
+                        "description": "Pourcentage appliqué aux marchands",
+                        "type": "number",
+                        "format": "float",
+                        "example": 5.25
+                    }
+                },
+                "type": "object"
+            },
+            "DailyStatistics": {
+                "properties": {
+                    "transfers": {
+                        "description": "Nombre de transferts réussis",
+                        "type": "integer",
+                        "example": 25
+                    },
+                    "deposits": {
+                        "description": "Nombre de dépôts réussis",
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "withdrawals": {
+                        "description": "Nombre de retraits réussis",
+                        "type": "integer",
+                        "example": 8
+                    },
+                    "merchant_payments": {
+                        "description": "Nombre de paiements marchands réussis",
+                        "type": "integer",
+                        "example": 15
+                    }
+                },
+                "type": "object"
+            },
             "User": {
                 "properties": {
                     "id": {
@@ -2042,17 +2805,19 @@
                             "depot",
                             "retrait",
                             "transfert",
-                            "paiement"
+                            "paiement",
+                            "achat_virtuel"
                         ],
                         "example": "transfert"
                     },
                     "montant": {
+                        "description": "Montant de base de la transaction",
                         "type": "number",
                         "format": "float",
                         "example": 50000
                     },
                     "frais": {
-                        "description": "Frais appliqués à la transaction",
+                        "description": "Frais totaux appliqués (frais système + taxes utilisateur)",
                         "type": "number",
                         "format": "float",
                         "example": 7.5
@@ -2099,6 +2864,41 @@
                     }
                 },
                 "type": "object"
+            },
+            "TransactionValidation": {
+                "description": "Règles de validation appliquées automatiquement lors des transactions",
+                "properties": {
+                    "user_not_banned": {
+                        "description": "L'utilisateur ne doit pas être banni",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "transfer_enabled": {
+                        "description": "Les transferts doivent être autorisés",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "specific_permissions": {
+                        "description": "Permissions spécifiques selon le type de transaction",
+                        "type": "string",
+                        "enum": [
+                            "can_transfer_to_client",
+                            "can_pay_merchant"
+                        ]
+                    },
+                    "sufficient_balance": {
+                        "description": "Solde suffisant incluant frais et taxes",
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "user_tax_applied": {
+                        "description": "Taxe utilisateur appliquée en %",
+                        "type": "number",
+                        "format": "float",
+                        "example": 2.5
+                    }
+                },
+                "type": "object"
             }
         },
         "securitySchemes": {
@@ -2118,7 +2918,7 @@
     "tags": [
         {
             "name": "Administration",
-            "description": "Endpoints pour les administrateurs"
+            "description": "Endpoints pour les administrateurs - Gestion des droits utilisateurs, statistiques et configuration"
         },
         {
             "name": "Authentification",
@@ -2130,7 +2930,7 @@
         },
         {
             "name": "Transactions",
-            "description": "Gestion des transactions financières"
+            "description": "Système de transactions unifiées - Détection automatique du type selon l'émetteur et le destinataire (Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement)"
         },
         {
             "name": "Utilisateurs",

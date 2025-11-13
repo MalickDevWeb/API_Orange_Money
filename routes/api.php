@@ -42,8 +42,8 @@ Route::get('/status', function () {
 // Routes pour les comptes
 Route::middleware(T::passport->value)->group(function () {
     Route::get('comptes/me', [\App\Http\Controllers\CompteController::class, 'me']);
-    Route::get('comptes/me/balance', [\App\Http\Controllers\CompteController::class, 'solde']);
-    Route::post('comptes/{compte}/activate', [\App\Http\Controllers\CompteController::class, 'activate']);
+    Route::get('balance', [\App\Http\Controllers\CompteController::class, 'solde']); // Endpoint commun pour le solde
+    Route::post('comptes/activate/{nom_compte}', [\App\Http\Controllers\CompteController::class, 'activate']);
     Route::apiResource('comptes', \App\Http\Controllers\CompteController::class);
     Route::post('comptes/{compte}/restore', [\App\Http\Controllers\CompteController::class, 'restore']);
     Route::delete('comptes/{compte}/force-delete', [\App\Http\Controllers\CompteController::class, 'forceDelete']);
@@ -51,6 +51,9 @@ Route::middleware(T::passport->value)->group(function () {
 
 Route::middleware(T::passport->value)->group(function () {
     Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class);
+    Route::post('transactions/retrait', [\App\Http\Controllers\TransactionController::class, 'retrait']);
+    Route::post('transactions/achat-virtuel', [\App\Http\Controllers\TransactionController::class, 'achatVirtuel']);
+    Route::post('transactions/unified', [\App\Http\Controllers\TransactionController::class, 'unifiedTransaction']);
 });
 
 // Routes d'administration
@@ -58,6 +61,12 @@ Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::get('users/pending', [AdminController::class, 'getPendingUsers']);
     Route::post('users/{telephone}/approve', [AdminController::class, 'approveUser']);
     Route::post('users/{telephone}/reject', [AdminController::class, 'rejectUser']);
+    Route::put('users/{user}/rights', [AdminController::class, 'updateUserRights']);
+    Route::post('users/{user}/ban', [AdminController::class, 'banUser']);
+    Route::post('users/{user}/unban', [AdminController::class, 'unbanUser']);
+    Route::put('users/{user}/tax', [AdminController::class, 'setUserTax']);
+    Route::get('statistics/daily', [AdminController::class, 'getDailyStatistics']);
+    Route::put('fees/global', [AdminController::class, 'updateGlobalFees']);
     Route::get('balance-requests/pending', [AdminController::class, 'getPendingBalanceRequests']);
     Route::post('balance-requests/{id}/approve', [AdminController::class, 'approveBalanceRequest']);
     Route::post('balance-requests/{id}/reject', [AdminController::class, 'rejectBalanceRequest']);

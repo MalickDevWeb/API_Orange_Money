@@ -12,7 +12,11 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // $schedule->command('inspire')->hourly();
+        // Nettoyer les codes OTP expirés toutes les 30 minutes
+        $schedule->command('otp:clean-expired')
+                ->everyThirtyMinutes()
+                ->withoutOverlapping()
+                ->runInBackground();
     }
 
     /**

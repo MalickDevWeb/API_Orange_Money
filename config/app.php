@@ -185,4 +185,19 @@ return [
         // 'Example' => App\Facades\Example::class,
     ])->toArray(),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Configuration de la pagination pour les listes. Ces valeurs peuvent être
+    | modifiées par l'administrateur via l'interface d'administration.
+    |
+    */
+
+    'pagination' => [
+        'default_per_page' => env('PAGINATION_DEFAULT_PER_PAGE', 15),
+        'max_per_page' => env('PAGINATION_MAX_PER_PAGE', 20),
+    ],
+
 ];
