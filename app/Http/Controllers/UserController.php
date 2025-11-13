@@ -23,51 +23,6 @@ class UserController extends Controller
     use ApiResponseTrait;
 
 
-    /**
-     * @OA\Post(
-     *     path="/suppliers/balance-request",
-     *     operationId="requestBalance",
-     *     tags={"Fournisseurs"},
-     *     summary="Demander l'achat de solde (fournisseur)",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"montant"},
-     *             @OA\Property(property="montant", type="number", format="float", example=100000)
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Demande créée",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Demande de solde créée avec succès")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Accès réservé aux fournisseurs approuvés")
-     * )
-     */
-    public function requestBalance(Request $request)
-    {
-        /** @var \Illuminate\Http\Request $request */
-        $user = auth('api')->user();
-        if (!$user || !(in_array($user->type, ['commercant', 'fournisseur'])) || $user->statut !== 'actif') {
-            return $this->errorResponse(MessagesErreursRequests::SUPPLIER_ACCESS_DENIED->value, 403);
-        }
-
-        $data = $request->validate([
-            MessagesErreursRequests::VALIDATION_MONTANT->value => MessagesErreursRequests::VALIDATION_MONTANT_RULES->value,
-        ]);
-
-        $balanceRequest = BalanceRequest::create([
-            'supplier_id' => $user->id,
-            'montant' => $data['montant'],
-            'statut' => BalanceRequestStatus::EN_ATTENTE->value,
-        ]);
-
-        return $this->respondCreated($balanceRequest, ResponseMessage::BALANCE_REQUEST_CREATED->value);
-    }
 
     /**
      * @OA\Put(

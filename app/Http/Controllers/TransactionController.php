@@ -14,58 +14,61 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\View;
 
 /**
- * @OA\Tag(
- *     name="Transactions",
- *     description="Système de transactions unifiées - Détection automatique du type selon l'émetteur et le destinataire (Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement)"
- * )
- *
- * @OA\Schema(
- *     schema="Transaction",
- *     type="object",
- *     @OA\Property(property="id", type="string", format="uuid", example="uuid-transaction"),
- *     @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
- *     @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de base de la transaction"),
- *     @OA\Property(property="frais", type="number", format="float", example=7.5, description="Frais totaux appliqués (frais système + taxes utilisateur)"),
- *     @OA\Property(property="reference", type="string", example="TXN-123456"),
- *     @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie"),
- *     @OA\Property(property="note", type="string", nullable=true, example="Paiement de facture"),
- *     @OA\Property(property="compte_emetteur_id", type="string", format="uuid", nullable=true),
- *     @OA\Property(property="compte_recepteur_id", type="string", format="uuid", nullable=true),
- *     @OA\Property(property="date_transaction", type="string", format="date-time"),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time")
- * )
- *
- * @OA\Schema(
- *     schema="TransactionValidation",
- *     type="object",
- *     description="Règles de validation appliquées automatiquement lors des transactions",
- *     @OA\Property(property="user_not_banned", type="boolean", example=true, description="L'utilisateur ne doit pas être banni"),
- *     @OA\Property(property="transfer_enabled", type="boolean", example=true, description="Les transferts doivent être autorisés"),
- *     @OA\Property(property="specific_permissions", type="string", enum={"can_transfer_to_client","can_pay_merchant"}, description="Permissions spécifiques selon le type de transaction"),
- *     @OA\Property(property="sufficient_balance", type="boolean", example=true, description="Solde suffisant incluant frais et taxes"),
- *     @OA\Property(property="user_tax_applied", type="number", format="float", example=2.5, description="Taxe utilisateur appliquée en %")
- * )
- *
- * @OA\PathItem(
- *     path="/transactions"
- * )
- * @OA\PathItem(
- *     path="/transactions/{transaction}"
- * )
- * @OA\PathItem(
- *     path="/transactions/retrait"
- * )
- * @OA\PathItem(
- *     path="/transactions/unified"
- * )
- *
- * @property-read \App\Models\User $user
- * @method bool canTransfer() on User model
- * @method bool canTransferToClient() on User model
- * @method bool canPayMerchant() on User model
- * @method bool isBanned() on User model
- */
+  * @OA\Tag(
+  *     name="Transactions",
+  *     description="Système de transactions unifiées - Détection automatique du type selon l'émetteur et le destinataire (Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement)"
+  * )
+  *
+  * @OA\Schema(
+  *     schema="Transaction",
+  *     type="object",
+  *     @OA\Property(property="id", type="string", format="uuid", example="uuid-transaction"),
+  *     @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
+  *     @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de base de la transaction"),
+  *     @OA\Property(property="frais", type="number", format="float", example=7.5, description="Frais totaux appliqués (frais système + taxes utilisateur)"),
+  *     @OA\Property(property="reference", type="string", example="TXN-123456"),
+  *     @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie"),
+  *     @OA\Property(property="note", type="string", nullable=true, example="Paiement de facture"),
+  *     @OA\Property(property="compte_emetteur_id", type="string", format="uuid", nullable=true),
+  *     @OA\Property(property="compte_recepteur_id", type="string", format="uuid", nullable=true),
+  *     @OA\Property(property="date_transaction", type="string", format="date-time"),
+  *     @OA\Property(property="created_at", type="string", format="date-time"),
+  *     @OA\Property(property="updated_at", type="string", format="date-time")
+  * )
+  *
+  * @OA\Schema(
+  *     schema="TransactionValidation",
+  *     type="object",
+  *     description="Règles de validation appliquées automatiquement lors des transactions",
+  *     @OA\Property(property="user_not_banned", type="boolean", example=true, description="L'utilisateur ne doit pas être banni"),
+  *     @OA\Property(property="transfer_enabled", type="boolean", example=true, description="Les transferts doivent être autorisés"),
+  *     @OA\Property(property="specific_permissions", type="string", enum={"can_transfer_to_client","can_pay_merchant"}, description="Permissions spécifiques selon le type de transaction"),
+  *     @OA\Property(property="sufficient_balance", type="boolean", example=true, description="Solde suffisant incluant frais et taxes"),
+  *     @OA\Property(property="user_tax_applied", type="number", format="float", example=2.5, description="Taxe utilisateur appliquée en %")
+  * )
+  *
+  * @OA\PathItem(
+  *     path="/transactions"
+  * )
+  * @OA\PathItem(
+  *     path="/transactions/{transaction}"
+  * )
+  * @OA\PathItem(
+  *     path="/transactions/retrait"
+  * )
+  * @OA\PathItem(
+  *     path="/transactions/unified"
+  * )
+  * @OA\PathItem(
+   *     path="/transactions/demande"
+   * )
+  *
+  * @property-read \App\Models\User $user
+  * @method bool canTransfer() on User model
+  * @method bool canTransferToClient() on User model
+  * @method bool canPayMerchant() on User model
+  * @method bool isBanned() on User model
+  */
 class TransactionController extends Controller
 {
     use ApiResponseTrait, PaginatedSortedTrait;
@@ -558,86 +561,6 @@ class TransactionController extends Controller
         }
     }
 
-    /**
-     * @OA\Put(
-     *     path="/transactions/{transaction}",
-     *     tags={"Transactions"},
-     *     summary="Mettre à jour une transaction",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="transaction",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string"),
-     *         description="ID de la transaction"
-     *     ),
-     *     @OA\RequestBody(
-     *         @OA\JsonContent(
-     *             @OA\Property(property="note", type="string", example="Note mise à jour"),
-     *             @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Transaction mise à jour",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     )
-     * )
-     */
-    public function update(Request $request, Transaction $transaction)
-    {
-        try {
-            $data = $request->validate([
-                'note' => 'nullable|string',
-                'statut' => 'nullable|string|in:reussie,echouee,annulee',
-            ]);
-
-            $transaction = $this->transactionService->update($transaction->id, $data);
-            if (!$transaction) {
-                return $this->errorResponse('Erreur lors de la mise à jour de la transaction');
-            }
-
-            return $this->successResponse($transaction, 'Transaction mise à jour avec succès');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
-
-    /**
-     * @OA\Delete(
-     *     path="/transactions/{transaction}",
-     *     tags={"Transactions"},
-     *     summary="Supprimer une transaction",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="transaction",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string"),
-     *         description="ID de la transaction"
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Transaction supprimée",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="message", type="string", example="Transaction supprimée avec succès")
-     *         )
-     *     )
-     * )
-     */
-    public function destroy(Transaction $transaction)
-    {
-        try {
-            $result = $this->transactionService->delete($transaction->id);
-            if (!$result) {
-                return $this->errorResponse('Erreur lors de la suppression de la transaction');
-            }
-
-            return $this->successResponse(null, 'Transaction supprimée avec succès');
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
 
     public function depot(Request $request)
     {
@@ -1484,4 +1407,93 @@ class TransactionController extends Controller
             return $this->errorResponse($e->getMessage());
         }
     }
+
+    /**
+      * @OA\Post(
+      *     path="/transactions/demande",
+      *     tags={"Transactions"},
+      *     summary="Demander l'achat de solde (fournisseur)",
+      *     description="Permet aux fournisseurs d'effectuer une demande d'achat de solde auprès d'un administrateur spécifique. La demande sera en attente par défaut et l'administrateur recevra une notification par email.",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\RequestBody(
+      *         required=true,
+      *         @OA\JsonContent(
+      *             required={"montant","telephone_admin"},
+      *             @OA\Property(property="montant", type="number", format="float", example=100000, description="Montant demandé"),
+      *             @OA\Property(property="telephone_admin", type="string", example="771234567", description="Numéro de téléphone de l'administrateur destinataire")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=201,
+      *         description="Demande créée avec succès",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="status", type="string", example="success"),
+      *             @OA\Property(property="message", type="string", example="Demande de solde créée avec succès")
+      *         )
+      *     ),
+      *     @OA\Response(response=403, description="Accès réservé aux fournisseurs approuvés"),
+      *     @OA\Response(response=404, description="Administrateur non trouvé")
+      * )
+      */
+     public function balanceRequest(Request $request)
+     {
+         try {
+             /** @var \App\Models\User $user */
+             $user = auth()->user();
+
+             // Vérifier que c'est un fournisseur approuvé
+             if (!$user->isFournisseur() || $user->statut !== 'actif') {
+                 return $this->errorResponse('Accès réservé aux fournisseurs approuvés', 403);
+             }
+
+             $data = $request->validate([
+                 'montant' => 'required|numeric|min:0.01',
+                 'telephone_admin' => 'required|string|exists:users,telephone',
+             ]);
+
+             // Vérifier que l'utilisateur spécifié est un admin
+             $admin = \App\Models\User::where('telephone', $data['telephone_admin'])
+                                     ->where('type', 'admin')
+                                     ->first();
+             if (!$admin) {
+                 return $this->errorResponse('Administrateur non trouvé', 404);
+             }
+
+             // Créer la demande de solde
+             $balanceRequest = \App\Models\BalanceRequest::create([
+                 'supplier_id' => $user->id,
+                 'admin_id' => $admin->id,
+                 'montant' => $data['montant'],
+                 'statut' => 'en_attente',
+             ]);
+
+             // Envoyer un email à l'administrateur spécifié
+             if ($admin->email) {
+                 $subject = "Nouvelle demande de solde - {$user->nom} {$user->prenom}";
+                 $message = "Le fournisseur {$user->nom} {$user->prenom} ({$user->telephone}) a demandé l'achat de {$data['montant']} FCFA de solde.";
+                 $htmlContent = View::make('emails.transaction-notification', [
+                     'transaction' => null,
+                     'message' => $message,
+                     'role' => 'admin_notification'
+                 ])->render();
+                 $this->brevoService->sendMail($admin->email, $subject, $htmlContent);
+             }
+
+             // Envoyer un email de confirmation au fournisseur
+             if ($user->email) {
+                 $subject = "Demande de solde envoyée - {$balanceRequest->id}";
+                 $message = "Votre demande d'achat de {$data['montant']} FCFA de solde a été envoyée à l'administrateur {$admin->nom} {$admin->prenom}. Elle sera traitée dans les plus brefs délais.";
+                 $htmlContent = View::make('emails.transaction-notification', [
+                     'transaction' => null,
+                     'message' => $message,
+                     'role' => 'supplier_confirmation'
+                 ])->render();
+                 $this->brevoService->sendMail($user->email, $subject, $htmlContent);
+             }
+
+             return $this->respondCreated($balanceRequest, 'Demande de solde créée avec succès. Vous recevrez une confirmation par email et l\'administrateur a été notifié.');
+         } catch (\Exception $e) {
+             return $this->errorResponse($e->getMessage());
+         }
+     }
 }

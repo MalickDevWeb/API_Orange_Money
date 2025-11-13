@@ -239,117 +239,123 @@ class AdminController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/admin/balance-requests/{id}/approve",
-     *     operationId="approveBalanceRequest",
-     *     tags={"Administration"},
-     *     summary="Approuver une demande de solde",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Demande approuvée",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Demande de solde approuvée")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Non autorisé"),
-     *     @OA\Response(response=404, description="Demande non trouvée")
-     * )
-     */
-    public function approveBalanceRequest($id)
-    {
-        try {
-            $id = trim($id, '"');
-            $request = BalanceRequest::findOrFail($id);
+      * @OA\Post(
+      *     path="/admin/balance-requests/{telephone}/approve",
+      *     operationId="approveBalanceRequest",
+      *     tags={"Administration"},
+      *     summary="Approuver une demande de solde",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\Parameter(
+      *         name="telephone",
+      *         in="path",
+      *         required=true,
+      *         @OA\Schema(type="string", example="771234567")
+      *     ),
+      *     @OA\Response(
+      *         response=200,
+      *         description="Demande approuvée",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="status", type="string", example="success"),
+      *             @OA\Property(property="message", type="string", example="Demande de solde approuvée")
+      *         )
+      *     ),
+      *     @OA\Response(response=403, description="Non autorisé"),
+      *     @OA\Response(response=404, description="Demande non trouvée")
+      * )
+      */
+     public function approveBalanceRequest($telephone)
+     {
+         try {
+             $telephone = trim($telephone, '"');
+             // Trouver la demande de solde en attente pour ce numéro de téléphone
+             $request = BalanceRequest::whereHas('supplier', function($q) use ($telephone) {
+                 $q->where('telephone', $telephone);
+             })->where('statut', BalanceRequestStatus::EN_ATTENTE->value)->firstOrFail();
 
-            $request->update([
-                'statut' => BalanceRequestStatus::APPROUVEE->value,
-                'admin_id' => Auth::id(),
-                'traitee_at' => now()
-            ]);
+             $request->update([
+                 'statut' => BalanceRequestStatus::APPROUVEE->value,
+                 'admin_id' => Auth::id(),
+                 'traitee_at' => now()
+             ]);
 
-            // Créer une transaction de dépôt pour ajouter le montant au solde du fournisseur
-            $supplier = $request->supplier;
-            if ($supplier && $supplier->comptes->count() > 0) {
-                $compte = $supplier->comptes->first();
-                \App\Models\Transaction::create([
-                    'type' => TransactionType::DEPOT->value,
-                    'montant' => $request->montant,
-                    'reference' => 'DEP-APPROVAL-' . strtoupper(uniqid()),
-                    'statut' => TransactionStatus::REUSSIE->value,
-                    'note' => 'Approbation de demande de solde',
-                    'compte_emetteur_id' => null,
-                    'compte_recepteur_id' => $compte->id,
-                    'date_transaction' => now(),
-                ]);
-            }
+             // Créer une transaction de dépôt pour ajouter le montant au solde du fournisseur
+             $supplier = $request->supplier;
+             if ($supplier && $supplier->comptes->count() > 0) {
+                 $compte = $supplier->comptes->first();
+                 \App\Models\Transaction::create([
+                     'type' => TransactionType::DEPOT->value,
+                     'montant' => $request->montant,
+                     'reference' => 'DEP-APPROVAL-' . strtoupper(uniqid()),
+                     'statut' => TransactionStatus::REUSSIE->value,
+                     'note' => 'Approbation de demande de solde',
+                     'compte_emetteur_id' => null,
+                     'compte_recepteur_id' => $compte->id,
+                     'date_transaction' => now(),
+                 ]);
+             }
 
-            return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_APPROVED->value);
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
+             return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_APPROVED->value);
+         } catch (\Exception $e) {
+             return $this->errorResponse($e->getMessage());
+         }
+     }
 
     /**
-     * @OA\Post(
-     *     path="/admin/balance-requests/{id}/reject",
-     *     operationId="rejectBalanceRequest",
-     *     tags={"Administration"},
-     *     summary="Rejeter une demande de solde",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string")
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="motif_rejet", type="string", example="Montant trop élevé")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Demande rejetée",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Demande de solde rejetée")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Non autorisé"),
-     *     @OA\Response(response=404, description="Demande non trouvée")
-     * )
-     */
-    public function rejectBalanceRequest(Request $request, $id)
-    {
-        try {
-            $request->validate([
-                MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
-            ]);
+      * @OA\Post(
+      *     path="/admin/balance-requests/{telephone}/reject",
+      *     operationId="rejectBalanceRequest",
+      *     tags={"Administration"},
+      *     summary="Rejeter une demande de solde",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\Parameter(
+      *         name="telephone",
+      *         in="path",
+      *         required=true,
+      *         @OA\Schema(type="string", example="771234567")
+      *     ),
+      *     @OA\RequestBody(
+      *         required=true,
+      *         @OA\JsonContent(
+      *             @OA\Property(property="motif_rejet", type="string", example="Montant trop élevé")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=200,
+      *         description="Demande rejetée",
+      *         @OA\JsonContent(
+      *             @OA\Property(property="status", type="string", example="success"),
+      *             @OA\Property(property="message", type="string", example="Demande de solde rejetée")
+      *         )
+      *     ),
+      *     @OA\Response(response=403, description="Non autorisé"),
+      *     @OA\Response(response=404, description="Demande non trouvée")
+      * )
+      */
+     public function rejectBalanceRequest(Request $request, $telephone)
+     {
+         try {
+             $request->validate([
+                 MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
+             ]);
 
-            $id = trim($id, '"');
-            $balanceRequest = BalanceRequest::findOrFail($id);
+             $telephone = trim($telephone, '"');
+             // Trouver la demande de solde en attente pour ce numéro de téléphone
+             $balanceRequest = BalanceRequest::whereHas('supplier', function($q) use ($telephone) {
+                 $q->where('telephone', $telephone);
+             })->where('statut', BalanceRequestStatus::EN_ATTENTE->value)->firstOrFail();
 
-            $balanceRequest->update([
-                'statut' => BalanceRequestStatus::REJETEE->value,
-                'motif_rejet' => $request->motif_rejet,
-                'admin_id' => Auth::id(),
-                'traitee_at' => now()
-            ]);
+             $balanceRequest->update([
+                 'statut' => BalanceRequestStatus::REJETEE->value,
+                 'motif_rejet' => $request->motif_rejet,
+                 'admin_id' => Auth::id(),
+                 'traitee_at' => now()
+             ]);
 
-            return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_REJECTED->value);
-        } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
-        }
-    }
+             return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_REJECTED->value);
+         } catch (\Exception $e) {
+             return $this->errorResponse($e->getMessage());
+         }
+     }
 
     /**
      * @OA\Post(

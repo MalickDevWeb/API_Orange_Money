@@ -1158,106 +1158,6 @@
                         "bearerAuth": []
                     }
                 ]
-            },
-            "put": {
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Mettre à jour une transaction",
-                "operationId": "PUT::/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::update",
-                "parameters": [
-                    {
-                        "name": "transaction",
-                        "in": "path",
-                        "description": "ID de la transaction",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Note mise à jour"
-                                    },
-                                    "statut": {
-                                        "type": "string",
-                                        "enum": [
-                                            "reussie",
-                                            "echouee",
-                                            "annulee"
-                                        ],
-                                        "example": "reussie"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Transaction mise à jour",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Transaction"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Transactions"
-                ],
-                "summary": "Supprimer une transaction",
-                "operationId": "DELETE::/transactions/{transaction}::App\\Http\\Controllers\\TransactionController::destroy",
-                "parameters": [
-                    {
-                        "name": "transaction",
-                        "in": "path",
-                        "description": "ID de la transaction",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Transaction supprimée",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Transaction supprimée avec succès"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
             }
         },
         "/transactions/retrait": {
@@ -1372,6 +1272,76 @@
                     },
                     "404": {
                         "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/transactions/demande": {
+            "post": {
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Demander l'achat de solde (fournisseur)",
+                "description": "Permet aux fournisseurs d'effectuer une demande d'achat de solde auprès d'un administrateur spécifique. La demande sera en attente par défaut et l'administrateur recevra une notification par email.",
+                "operationId": "POST::/transactions/demande::App\\Http\\Controllers\\TransactionController::balanceRequest",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "montant",
+                                    "telephone_admin"
+                                ],
+                                "properties": {
+                                    "montant": {
+                                        "description": "Montant demandé",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 100000
+                                    },
+                                    "telephone_admin": {
+                                        "description": "Numéro de téléphone de l'administrateur destinataire",
+                                        "type": "string",
+                                        "example": "771234567"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Demande créée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Demande de solde créée avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Accès réservé aux fournisseurs approuvés"
+                    },
+                    "404": {
+                        "description": "Administrateur non trouvé"
                     }
                 },
                 "security": [
@@ -1601,7 +1571,7 @@
                 ]
             }
         },
-        "/admin/balance-requests/{id}/approve": {
+        "/admin/balance-requests/{telephone}/approve": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1610,11 +1580,12 @@
                 "operationId": "approveBalanceRequest",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "telephone",
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "771234567"
                         }
                     }
                 ],
@@ -1653,7 +1624,7 @@
                 ]
             }
         },
-        "/admin/balance-requests/{id}/reject": {
+        "/admin/balance-requests/{telephone}/reject": {
             "post": {
                 "tags": [
                     "Administration"
@@ -1662,11 +1633,12 @@
                 "operationId": "rejectBalanceRequest",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "telephone",
                         "in": "path",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "771234567"
                         }
                     }
                 ],
@@ -2644,65 +2616,6 @@
                     }
                 ]
             }
-        },
-        "/suppliers/balance-request": {
-            "post": {
-                "tags": [
-                    "Fournisseurs"
-                ],
-                "summary": "Demander l'achat de solde (fournisseur)",
-                "operationId": "requestBalance",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "montant"
-                                ],
-                                "properties": {
-                                    "montant": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 100000
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Demande créée",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Demande de solde créée avec succès"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Accès réservé aux fournisseurs approuvés"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
         }
     },
     "components": {
@@ -3021,10 +2934,6 @@
         {
             "name": "Utilisateurs",
             "description": "Endpoints pour la gestion des utilisateurs"
-        },
-        {
-            "name": "Fournisseurs",
-            "description": "Fournisseurs"
         }
     ]
 }

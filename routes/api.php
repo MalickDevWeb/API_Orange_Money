@@ -50,10 +50,11 @@ Route::middleware(T::passport->value)->group(function () {
 });
 
 Route::middleware(T::passport->value)->group(function () {
-    Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class);
+    Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class)->except(['update', 'destroy']);
     Route::post('transactions/retrait', [\App\Http\Controllers\TransactionController::class, 'retrait']);
     Route::post('transactions/confirm-retrait', [\App\Http\Controllers\TransactionController::class, 'confirmRetrait']);
     Route::post('transactions/achat-virtuel', [\App\Http\Controllers\TransactionController::class, 'achatVirtuel']);
+    Route::post('transactions/demande', [\App\Http\Controllers\TransactionController::class, 'balanceRequest']);
     Route::post('transactions/unified', [\App\Http\Controllers\TransactionController::class, 'unifiedTransaction']);
 });
 
@@ -71,12 +72,12 @@ Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::get('statistics/daily', [AdminController::class, 'getDailyStatistics']);
     Route::put('fees/global', [AdminController::class, 'updateGlobalFees']);
     Route::get('balance-requests/pending', [AdminController::class, 'getPendingBalanceRequests']);
-    Route::post('balance-requests/{id}/approve', [AdminController::class, 'approveBalanceRequest']);
-    Route::post('balance-requests/{id}/reject', [AdminController::class, 'rejectBalanceRequest']);
+    Route::post('balance-requests/{telephone}/approve', [AdminController::class, 'approveBalanceRequest']);
+    Route::post('balance-requests/{telephone}/reject', [AdminController::class, 'rejectBalanceRequest']);
     Route::post('deposit', [AdminController::class, 'deposit']);
 });
 
 // Routes fournisseurs
 Route::middleware(T::passport->value)->prefix('suppliers')->group(function () {
-    Route::post('balance-request', [UserController::class, 'requestBalance']);
+    // Balance request moved to transactions section
 });
