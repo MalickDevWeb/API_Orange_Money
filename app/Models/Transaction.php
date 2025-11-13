@@ -30,11 +30,13 @@ class Transaction extends Model
         'compte_emetteur_id',
         'compte_recepteur_id',
         'date_transaction',
+        'frais',
     ];
 
     protected $casts = [
         'date_transaction' => 'datetime',
         'montant' => 'float',
+        'frais' => 'float',
     ];
 
 

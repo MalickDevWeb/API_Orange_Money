@@ -22,6 +22,7 @@ use Illuminate\Support\Facades\DB;
  *     @OA\Property(property="id", type="string", format="uuid", example="uuid-transaction"),
  *     @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement"}, example="transfert"),
  *     @OA\Property(property="montant", type="number", format="float", example=50000),
+ *     @OA\Property(property="frais", type="number", format="float", example=7.5, description="Frais appliqués à la transaction"),
  *     @OA\Property(property="reference", type="string", example="TXN-123456"),
  *     @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie"),
  *     @OA\Property(property="note", type="string", nullable=true, example="Paiement de facture"),
@@ -120,8 +121,8 @@ class TransactionController extends Controller
      *             @OA\Property(property="montant", type="number", format="float", example=50000),
      *             @OA\Property(property="reference", type="string", example="TXN-123456"),
      *             @OA\Property(property="note", type="string", example="Paiement de facture"),
-     *             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-emetteur"),
-     *             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-recepteur")
+     *             @OA\Property(property="telephone_emetteur_id", type="string", example="771234567"),
+     *             @OA\Property(property="telephone_recepteur_id", type="string", example="771234568")
      *         )
      *     ),
      *     @OA\Response(
@@ -140,45 +141,129 @@ class TransactionController extends Controller
                 'montant' => 'required|numeric|min:0.01',
                 'reference' => 'nullable|string|unique:transactions,reference',
                 'note' => 'nullable|string',
-                'compte_emetteur_id' => 'nullable|exists:comptes,id',
-                'compte_recepteur_id' => 'nullable|exists:comptes,id',
+                'telephone_emetteur_id' => 'nullable|string|exists:users,telephone',
+                'telephone_recepteur_id' => 'nullable|string|exists:users,telephone',
             ]);
 
             // Validation spécifique selon le type
             switch ($data['type']) {
                 case 'depot':
                     $request->validate([
-                        'compte_recepteur_id' => 'required|exists:comptes,id',
+                        'telephone_recepteur_id' => 'required|string|exists:users,telephone',
                     ]);
+                    // Trouver le compte récepteur
+                    $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
+                    if (!$userRecepteur || !$userRecepteur->comptes->first()) {
+                        return $this->errorResponse('Utilisateur destinataire non trouvé ou sans compte', 404);
+                    }
                     $data['compte_emetteur_id'] = null; // Système
+                    $data['compte_recepteur_id'] = $userRecepteur->comptes->first()->id;
                     $data['reference'] = $data['reference'] ?? 'DEP-' . strtoupper(uniqid());
                     break;
 
                 case 'retrait':
                     $request->validate([
-                        'compte_emetteur_id' => 'required|exists:comptes,id',
+                        'telephone_emetteur_id' => 'required|string|exists:users,telephone',
                     ]);
-                    // Vérifier le solde
-                    $compte = Compte::find($data['compte_emetteur_id']);
+                    // Trouver le compte émetteur
+                    $userEmetteur = \App\Models\User::where('telephone', $data['telephone_emetteur_id'])->first();
+                    if (!$userEmetteur || !$userEmetteur->comptes->first()) {
+                        return $this->errorResponse('Utilisateur émetteur non trouvé ou sans compte', 404);
+                    }
+                    $compte = $userEmetteur->comptes->first();
                     if ($compte->solde < $data['montant']) {
                         return $this->errorResponse('Solde insuffisant pour effectuer ce retrait', 400);
                     }
+                    $data['compte_emetteur_id'] = $compte->id;
                     $data['compte_recepteur_id'] = null; // Système
                     $data['reference'] = $data['reference'] ?? 'RET-' . strtoupper(uniqid());
                     break;
 
                 case 'transfert':
+                    $request->validate([
+                        'telephone_emetteur_id' => 'required|string|exists:users,telephone',
+                        'telephone_recepteur_id' => 'required|string|exists:users,telephone|different:telephone_emetteur_id',
+                    ]);
+                    // Trouver les comptes
+                    $userEmetteur = \App\Models\User::where('telephone', $data['telephone_emetteur_id'])->first();
+                    $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
+                    if (!$userEmetteur || !$userEmetteur->comptes->first() || !$userRecepteur || !$userRecepteur->comptes->first()) {
+                        return $this->errorResponse('Utilisateurs non trouvés ou sans comptes', 404);
+                    }
+                    $compteEmetteur = $userEmetteur->comptes->first();
+                    if ($compteEmetteur->solde < $data['montant']) {
+                        return $this->errorResponse('Solde insuffisant pour effectuer ce transfert', 400);
+                    }
+                    $data['compte_emetteur_id'] = $compteEmetteur->id;
+                    $data['compte_recepteur_id'] = $userRecepteur->comptes->first()->id;
+                    $data['reference'] = $data['reference'] ?? 'TRF-' . strtoupper(uniqid());
+                    break;
+
                 case 'paiement':
                     $request->validate([
-                        'compte_emetteur_id' => 'required|exists:comptes,id',
-                        'compte_recepteur_id' => 'required|exists:comptes,id|different:compte_emetteur_id',
+                        'code_marchand' => 'nullable|string|exists:comptes,code_marchand',
+                        'telephone_marchand' => 'nullable|string|exists:users,telephone',
                     ]);
-                    // Vérifier le solde
-                    $compteEmetteur = Compte::find($data['compte_emetteur_id']);
-                    if ($compteEmetteur->solde < $data['montant']) {
-                        return $this->errorResponse('Solde insuffisant pour effectuer cette transaction', 400);
+
+                    // Vérifier qu'au moins un des deux est fourni
+                    if (empty($request->code_marchand) && empty($request->telephone_marchand)) {
+                        return $this->errorResponse('Vous devez fournir soit le code marchand soit le numéro de téléphone du marchand', 422);
                     }
-                    $data['reference'] = $data['reference'] ?? ($data['type'] === 'transfert' ? 'TRF-' : 'PAY-') . strtoupper(uniqid());
+                    if (!empty($request->code_marchand) && !empty($request->telephone_marchand)) {
+                        return $this->errorResponse('Vous ne pouvez pas fournir à la fois le code marchand et le numéro de téléphone du marchand', 422);
+                    }
+
+                    // L'émetteur est l'utilisateur connecté
+                    $userEmetteur = auth()->user();
+                    $compteEmetteur = $userEmetteur->comptes->first();
+                    if (!$compteEmetteur) {
+                        return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur connecté', 404);
+                    }
+
+                    // Trouver le compte récepteur par code marchand ou numéro de téléphone
+                    $frais = 0;
+                    if (!empty($request->code_marchand)) {
+                        $compteRecepteur = Compte::where('code_marchand', $request->code_marchand)->first();
+                        if (!$compteRecepteur) {
+                            return $this->errorResponse('Marchand non trouvé', 404);
+                        }
+                        $userRecepteur = $compteRecepteur->utilisateur;
+                        if ($userRecepteur->type !== 'commercant') {
+                            return $this->errorResponse('Le compte fourni n\'appartient pas à un marchand', 400);
+                        }
+                        // Paiement par code marchand : pas de frais
+                        $frais = 0;
+                    } else {
+                        $userRecepteur = \App\Models\User::where('telephone', $request->telephone_marchand)->where('type', 'commercant')->first();
+                        if (!$userRecepteur) {
+                            return $this->errorResponse('Marchand non trouvé', 404);
+                        }
+                        $compteRecepteur = $userRecepteur->comptes->first();
+                        if (!$compteRecepteur) {
+                            return $this->errorResponse('Marchand non trouvé', 404);
+                        }
+                        // Paiement par numéro de téléphone : frais de 0.5%
+                        $frais = $data['montant'] * 0.005;
+                    }
+
+                    // Vérifier que les comptes sont différents
+                    if ($compteEmetteur->id === $compteRecepteur->id) {
+                        return $this->errorResponse('Impossible de payer vers le même compte', 400);
+                    }
+
+                    // Calculer le montant total à débiter (montant + frais)
+                    $montantTotal = $data['montant'] + $frais;
+
+                    // Vérifier le solde du compte émetteur
+                    if ($compteEmetteur->solde < $montantTotal) {
+                        return $this->errorResponse('Solde insuffisant pour effectuer ce paiement (incluant les frais)', 400);
+                    }
+
+                    $data['compte_emetteur_id'] = $compteEmetteur->id;
+                    $data['compte_recepteur_id'] = $compteRecepteur->id;
+                    $data['montant'] = $montantTotal; // Le montant débité inclut les frais
+                    $data['frais'] = $frais;
+                    $data['reference'] = $data['reference'] ?? 'PAY-' . strtoupper(uniqid());
                     break;
 
                 case 'achat_virtuel':
@@ -334,9 +419,9 @@ class TransactionController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"montant","compte_recepteur_id"},
+     *             required={"montant","telephone_recepteur"},
      *             @OA\Property(property="montant", type="number", format="float", example=50000),
-     *             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte"),
+     *             @OA\Property(property="telephone_recepteur", type="string", example="771234567"),
      *             @OA\Property(property="note", type="string", example="Dépôt d'argent")
      *         )
      *     ),
@@ -352,13 +437,24 @@ class TransactionController extends Controller
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'compte_recepteur_id' => 'required|exists:comptes,id',
+                'telephone_recepteur_id' => 'required|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
+
+            // Trouver le compte récepteur par numéro de téléphone
+            $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
+            if (!$userRecepteur) {
+                return $this->errorResponse('Utilisateur destinataire non trouvé', 404);
+            }
+            $compteRecepteur = $userRecepteur->comptes->first();
+            if (!$compteRecepteur) {
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur destinataire', 404);
+            }
 
             // Pour un dépôt, l'émetteur est null (système/admin)
             $data['type'] = 'depot';
             $data['compte_emetteur_id'] = null;
+            $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'DEP-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
             $data['date_transaction'] = now();
@@ -379,9 +475,9 @@ class TransactionController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"montant","compte_emetteur_id"},
+     *             required={"montant","telephone_emetteur"},
      *             @OA\Property(property="montant", type="number", format="float", example=25000),
-     *             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte"),
+     *             @OA\Property(property="telephone_emetteur", type="string", example="771234567"),
              @OA\Property(property="note", type="string", example="Retrait d'argent")
          )
      ),
@@ -398,18 +494,28 @@ class TransactionController extends Controller
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'compte_emetteur_id' => 'required|exists:comptes,id',
+                'telephone_emetteur_id' => 'required|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
 
+            // Trouver le compte émetteur par numéro de téléphone
+            $userEmetteur = \App\Models\User::where('telephone', $data['telephone_emetteur_id'])->first();
+            if (!$userEmetteur) {
+                return $this->errorResponse('Utilisateur émetteur non trouvé', 404);
+            }
+            $compteEmetteur = $userEmetteur->comptes->first();
+            if (!$compteEmetteur) {
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur émetteur', 404);
+            }
+
             // Vérifier le solde du compte
-            $compte = Compte::find($data['compte_emetteur_id']);
-            if ($compte->solde < $data['montant']) {
+            if ($compteEmetteur->solde < $data['montant']) {
                 return $this->errorResponse('Solde insuffisant pour effectuer ce retrait', 400);
             }
 
             // Pour un retrait, le récepteur est null (système/admin)
             $data['type'] = 'retrait';
+            $data['compte_emetteur_id'] = $compteEmetteur->id;
             $data['compte_recepteur_id'] = null;
             $data['reference'] = 'RET-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
@@ -431,9 +537,10 @@ class TransactionController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"montant","compte_emetteur_id","compte_recepteur_id"},
+     *             required={"montant","telephone_emetteur_id","telephone_recepteur_id"},
      *             @OA\Property(property="montant", type="number", format="float", example=30000),
-             @OA\Property(property="numero_client", type="string", example="771234567"),
+             @OA\Property(property="telephone_emetteur_id", type="string", example="771234567"),
+             @OA\Property(property="telephone_recepteur_id", type="string", example="771234568"),
              @OA\Property(property="note", type="string", example="Transfert d'argent")
          )
      ),
@@ -450,20 +557,23 @@ class TransactionController extends Controller
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'numero_client' => 'required|string|exists:users,telephone',
+                'telephone_emetteur_id' => 'required|string|exists:users,telephone',
+                'telephone_recepteur_id' => 'required|string|exists:users,telephone|different:telephone_emetteur_id',
                 'note' => 'nullable|string',
             ]);
 
-            // Trouver le compte émetteur (utilisateur authentifié)
-            /** @var \App\Models\User $userEmetteur */
-            $userEmetteur = auth()->user();
+            // Trouver le compte émetteur par numéro de téléphone
+            $userEmetteur = \App\Models\User::where('telephone', $data['telephone_emetteur_id'])->first();
+            if (!$userEmetteur) {
+                return $this->errorResponse('Utilisateur émetteur non trouvé', 404);
+            }
             $compteEmetteur = $userEmetteur->comptes->first();
             if (!$compteEmetteur) {
-                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur', 404);
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur émetteur', 404);
             }
 
-            // Trouver le compte récepteur par numéro de téléphone du client
-            $userRecepteur = \App\Models\User::where('telephone', $data['numero_client'])->first();
+            // Trouver le compte récepteur par numéro de téléphone
+            $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
             if (!$userRecepteur) {
                 return $this->errorResponse('Client destinataire non trouvé', 404);
             }
@@ -503,14 +613,15 @@ class TransactionController extends Controller
      *     summary="Effectuer un paiement (client vers commerçant)",
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
+      *         description="Pour effectuer un paiement, vous devez fournir soit le code_marchand soit le telephone_marchand, mais pas les deux en même temps. L'émetteur est automatiquement l'utilisateur connecté. Les paiements par numéro de téléphone incluent des frais de 0.5%.",
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"montant","compte_emetteur_id","compte_recepteur_id"},
-             @OA\Property(property="montant", type="number", format="float", example=15000),
-             @OA\Property(property="compte_emetteur_id", type="string", example="uuid-compte-client"),
-             @OA\Property(property="compte_recepteur_id", type="string", example="uuid-compte-commercant"),
-             @OA\Property(property="note", type="string", example="Paiement de produit")
-         )
+      *             required={"montant"},
+      *             @OA\Property(property="montant", type="number", format="float", example=15000, description="Montant du paiement"),
+              @OA\Property(property="code_marchand", type="string", description="Code unique du marchand (paiement sans frais supplémentaires)", example="MARCHAND123"),
+              @OA\Property(property="telephone_marchand", type="string", description="Numéro de téléphone du marchand (paiement avec frais de 0.5%)", example="771234568"),
+              @OA\Property(property="note", type="string", description="Note optionnelle", example="Paiement de produit")
+          )
      ),
      @OA\Response(
          response=201,
@@ -518,29 +629,57 @@ class TransactionController extends Controller
          @OA\JsonContent(ref="#/components/schemas/Transaction")
      ),
      @OA\Response(response=400, description="Solde insuffisant")
- )
- */
+  )
+  */
     public function paiement(Request $request)
     {
         try {
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'code_marchand' => 'required|string|exists:comptes,code_marchand',
+                'code_marchand' => 'nullable|string|exists:comptes,code_marchand',
+                'telephone_marchand' => 'nullable|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
 
-            // Trouver le compte émetteur (utilisateur authentifié)
-            /** @var \App\Models\User $userEmetteur */
+            // Vérifier qu'au moins un des deux est fourni
+            if (empty($data['code_marchand']) && empty($data['telephone_marchand'])) {
+                return $this->errorResponse('Vous devez fournir soit le code marchand soit le numéro de téléphone du marchand', 422);
+            }
+            if (!empty($data['code_marchand']) && !empty($data['telephone_marchand'])) {
+                return $this->errorResponse('Vous ne pouvez pas fournir à la fois le code marchand et le numéro de téléphone du marchand', 422);
+            }
+
+            // L'émetteur est l'utilisateur connecté
             $userEmetteur = auth()->user();
             $compteEmetteur = $userEmetteur->comptes->first();
             if (!$compteEmetteur) {
-                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur', 404);
+                return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur connecté', 404);
             }
 
-            // Trouver le compte récepteur par code marchand
-            $compteRecepteur = Compte::where('code_marchand', $data['code_marchand'])->first();
-            if (!$compteRecepteur) {
-                return $this->errorResponse('Marchand non trouvé', 404);
+            // Trouver le compte récepteur par code marchand ou numéro de téléphone
+            $frais = 0;
+            if (!empty($data['code_marchand'])) {
+                $compteRecepteur = Compte::where('code_marchand', $data['code_marchand'])->first();
+                if (!$compteRecepteur) {
+                    return $this->errorResponse('Marchand non trouvé', 404);
+                }
+                $userRecepteur = $compteRecepteur->utilisateur;
+                if ($userRecepteur->type !== 'commercant') {
+                    return $this->errorResponse('Le compte fourni n\'appartient pas à un marchand', 400);
+                }
+                // Paiement par code marchand : pas de frais
+                $frais = 0;
+            } else {
+                $userRecepteur = \App\Models\User::where('telephone', $data['telephone_marchand'])->where('type', 'commercant')->first();
+                if (!$userRecepteur) {
+                    return $this->errorResponse('Marchand non trouvé', 404);
+                }
+                $compteRecepteur = $userRecepteur->comptes->first();
+                if (!$compteRecepteur) {
+                    return $this->errorResponse('Marchand non trouvé', 404);
+                }
+                // Paiement par numéro de téléphone : frais de 0.5%
+                $frais = $data['montant'] * 0.005;
             }
 
             // Vérifier que les comptes sont différents
@@ -548,17 +687,22 @@ class TransactionController extends Controller
                 return $this->errorResponse('Impossible de payer vers le même compte', 400);
             }
 
+            // Calculer le montant total à débiter (montant + frais)
+            $montantTotal = $data['montant'] + $frais;
+
             // Vérifier le solde du compte émetteur
-            if ($compteEmetteur->solde < $data['montant']) {
-                return $this->errorResponse('Solde insuffisant pour effectuer ce paiement', 400);
+            if ($compteEmetteur->solde < $montantTotal) {
+                return $this->errorResponse('Solde insuffisant pour effectuer ce paiement (incluant les frais)', 400);
             }
 
             $data['type'] = 'paiement';
+            $data['montant'] = $montantTotal; // Le montant débité inclut les frais
             $data['compte_emetteur_id'] = $compteEmetteur->id;
             $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'PAY-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
             $data['date_transaction'] = now();
+            $data['frais'] = $frais; // Ajouter les frais dans les données
 
             $transaction = $this->transactionService->create($data);
             return $this->respondCreated($transaction, 'Paiement effectué avec succès');

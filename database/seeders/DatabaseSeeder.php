@@ -18,8 +18,11 @@ class DatabaseSeeder extends Seeder
            UserSeeder::class,
            CompteSeeder::class,
            TransactionSeeder::class,
+           ComprehensiveTestSeeder::class,
+           BalanceRequestSeeder::class,
+           OtpCodeSeeder::class,
         ]
-         );
+          );
 
     }
 }

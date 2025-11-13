@@ -64,16 +64,17 @@ class AdminController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/admin/users/{id}/approve",
+     *     path="/admin/users/{telephone}/approve",
      *     operationId="approveUser",
      *     tags={"Administration"},
-     *     summary="Approuver un utilisateur",
+     *     summary="Approuver un utilisateur par numéro de téléphone",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="telephone",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string")
+     *         @OA\Schema(type="string", example="770000040"),
+     *         description="Numéro de téléphone de l'utilisateur à approuver"
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -87,11 +88,11 @@ class AdminController extends Controller
      *     @OA\Response(response=404, description="Utilisateur non trouvé")
      * )
      */
-    public function approveUser($id)
+    public function approveUser($telephone)
     {
         try {
-            $id = trim($id, '"');
-            $user = User::findOrFail($id);
+            $telephone = trim($telephone, '"');
+            $user = User::where('telephone', $telephone)->firstOrFail();
 
             if (!($user->isCommercant() || $user->isFournisseur())) {
                 return $this->errorResponse(MessagesErreursRequests::APPROVABLE_TYPE_ERROR->value, 400);
@@ -111,16 +112,17 @@ class AdminController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/admin/users/{id}/reject",
+     *     path="/admin/users/{telephone}/reject",
      *     operationId="rejectUser",
      *     tags={"Administration"},
-     *     summary="Rejeter un utilisateur",
+     *     summary="Rejeter un utilisateur par numéro de téléphone",
      *     security={{"bearerAuth":{}}},
      *     @OA\Parameter(
-     *         name="id",
+     *         name="telephone",
      *         in="path",
      *         required=true,
-     *         @OA\Schema(type="string")
+     *         @OA\Schema(type="string", example="770000040"),
+     *         description="Numéro de téléphone de l'utilisateur à rejeter"
      *     ),
      *     @OA\RequestBody(
      *         required=true,
@@ -140,15 +142,15 @@ class AdminController extends Controller
      *     @OA\Response(response=404, description="Utilisateur non trouvé")
      * )
      */
-    public function rejectUser(Request $request, $id)
+    public function rejectUser(Request $request, $telephone)
     {
         try {
             $request->validate([
                 MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
             ]);
 
-            $id = trim($id, '"');
-            $user = User::findOrFail($id);
+            $telephone = trim($telephone, '"');
+            $user = User::where('telephone', $telephone)->firstOrFail();
 
             if (!($user->isCommercant() || $user->isFournisseur())) {
                 return $this->errorResponse(MessagesErreursRequests::REJECTABLE_TYPE_ERROR->value, 400);

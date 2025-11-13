@@ -12,107 +12,62 @@ class UserSeeder extends Seeder
 {
     public function run(): void
     {
-
-
-        // Supprime tous les utilisateurs existants pour éviter les doublons
+        // Supprime tous les utilisateurs existants
         User::truncate();
+        Compte::truncate();
+
         $password = 'papa1732';
 
-        // Admin
-        $admin = User::factory()->admin()->create([
+        // Admin: Cotch Wane
+        User::factory()->admin()->create([
+            'id' => (string) Str::uuid(),
+            'nom' => 'Cotch',
+            'prenom' => 'Wane',
+            'telephone' => '770000000',
+            'email' => 'pppttt1732@gmail.com',
+            'password' => Hash::make($password),
+        ]);
+
+        // Client: Papa Client1
+        User::factory()->create([
             'id' => (string) Str::uuid(),
             'nom' => 'Papa',
-            'prenom' => 'Admin',
+            'prenom' => 'Client1',
             'telephone' => '770000001',
-            'email' => 'papaadmin@gmail.com',
+            'email' => 'demon001teuw@gmail.com',
+            'type' => 'client',
             'password' => Hash::make($password),
         ]);
 
-        Compte::factory()->create([
-            'id' => (string) Str::uuid(),
-            'numero_compte' => 'CMPT-ADMIN-001',
-            'titulaire' => $admin->nom . ' ' . $admin->prenom,
-            'code_marchand' => null,
-            'statut' => 'actif',
-            'utilisateur_id' => $admin->id,
-        ]);
-
-        // Client
-        $client = User::factory()->create([
+        // Client: Papa Client2
+        User::factory()->create([
             'id' => (string) Str::uuid(),
             'nom' => 'Papa',
-            'prenom' => 'Client',
+            'prenom' => 'Client2',
             'telephone' => '770000002',
-            'email' => 'papaclient@gmail.com',
+            'email' => 'demon002teuw@gmail.com',
             'type' => 'client',
             'password' => Hash::make($password),
         ]);
 
-        Compte::factory()->create([
+        // Fournisseur: Allasane Fournisseur
+        User::factory()->fournisseur()->create([
             'id' => (string) Str::uuid(),
-            'numero_compte' => 'CMPT-CLIENT-001',
-            'titulaire' => $client->nom . ' ' . $client->prenom,
-            'code_marchand' => null,
-            'statut' => 'actif',
-            'utilisateur_id' => $client->id,
-        ]);
-
-        // Test Client for authentication testing
-        $testClient = User::factory()->create([
-            'id' => (string) Str::uuid(),
-            'nom' => 'malick',
-            'prenom' => 'teuw',
-            'telephone' => '788373031',
-            'email' => 'malickteuw.devweb@gmail.com',
-            'type' => 'client',
-            'password' => Hash::make($password),
-        ]);
-
-        // Test Client for email failure simulation
-        $testClient2 = User::factory()->create([
-            'id' => (string) Str::uuid(),
-            'nom' => 'malick',
-            'prenom' => 'teuw',
-            'telephone' => '705334611',
-            'email' => 'teuwpapamalick173@gmail.com',
-            'type' => 'client',
-            'password' => Hash::make($password),
-        ]);
-
-        Compte::factory()->create([
-            'id' => (string) Str::uuid(),
-            'numero_compte' => 'CMPT-CLIENT-002',
-            'titulaire' => $testClient->nom . ' ' . $testClient->prenom,
-            'code_marchand' => null,
-            'statut' => 'actif',
-            'utilisateur_id' => $testClient->id,
-        ]);
-
-        Compte::factory()->create([
-            'id' => (string) Str::uuid(),
-            'numero_compte' => 'CMPT-CLIENT-003',
-            'titulaire' => $testClient2->nom . ' ' . $testClient2->prenom,
-            'code_marchand' => null,
-            'statut' => 'actif',
-            'utilisateur_id' => $testClient2->id,
-        ]);
-
-        // Commerçant
-        $commercant = User::factory()->commercant()->create([
-            'id' => (string) Str::uuid(),
-            'nom' => 'Papa',
-            'prenom' => 'Commercant',
+            'nom' => 'Allasane',
+            'prenom' => 'Fournisseur',
             'telephone' => '770000003',
-            'email' => 'papacommercant@gmail.com',
+            'email' => 'demon003teuw@gmail.com',
             'password' => Hash::make($password),
         ]);
 
-        Compte::factory()->marchand()->create([
+        // Marchant: Fallou marchant
+        User::factory()->commercant()->create([
             'id' => (string) Str::uuid(),
-            'numero_compte' => 'CMPT-MRC-001',
-            'titulaire' => $commercant->nom . ' ' . $commercant->prenom,
-            'statut' => 'actif',
-            'utilisateur_id' => $commercant->id,
+            'nom' => 'Fallou',
+            'prenom' => 'marchant',
+            'telephone' => '770000004',
+            'email' => 'teuwpapamalick1732@gmail.com',
+            'password' => Hash::make($password),
         ]);
     }
 }

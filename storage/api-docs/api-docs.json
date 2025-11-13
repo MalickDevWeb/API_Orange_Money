@@ -157,11 +157,6 @@
                                         "otp_sent": {
                                             "type": "boolean",
                                             "example": true
-                                        },
-                                        "otp_code": {
-                                            "description": "Code OTP (uniquement en développement)",
-                                            "type": "string",
-                                            "example": "123456"
                                         }
                                     },
                                     "type": "object"
@@ -703,13 +698,13 @@
                                         "type": "string",
                                         "example": "Paiement de facture"
                                     },
-                                    "compte_emetteur_id": {
+                                    "telephone_emetteur_id": {
                                         "type": "string",
-                                        "example": "uuid-compte-emetteur"
+                                        "example": "771234567"
                                     },
-                                    "compte_recepteur_id": {
+                                    "telephone_recepteur_id": {
                                         "type": "string",
-                                        "example": "uuid-compte-recepteur"
+                                        "example": "771234568"
                                     }
                                 },
                                 "type": "object"
@@ -893,7 +888,7 @@
                             "schema": {
                                 "required": [
                                     "montant",
-                                    "compte_recepteur_id"
+                                    "telephone_recepteur"
                                 ],
                                 "properties": {
                                     "montant": {
@@ -901,9 +896,9 @@
                                         "format": "float",
                                         "example": 50000
                                     },
-                                    "compte_recepteur_id": {
+                                    "telephone_recepteur": {
                                         "type": "string",
-                                        "example": "uuid-compte"
+                                        "example": "771234567"
                                     },
                                     "note": {
                                         "type": "string",
@@ -948,7 +943,7 @@
                             "schema": {
                                 "required": [
                                     "montant",
-                                    "compte_emetteur_id"
+                                    "telephone_emetteur"
                                 ],
                                 "properties": {
                                     "montant": {
@@ -956,9 +951,9 @@
                                         "format": "float",
                                         "example": 25000
                                     },
-                                    "compte_emetteur_id": {
+                                    "telephone_emetteur": {
                                         "type": "string",
-                                        "example": "uuid-compte"
+                                        "example": "771234567"
                                     },
                                     "note": {
                                         "type": "string",
@@ -1006,8 +1001,8 @@
                             "schema": {
                                 "required": [
                                     "montant",
-                                    "compte_emetteur_id",
-                                    "compte_recepteur_id"
+                                    "telephone_emetteur_id",
+                                    "telephone_recepteur_id"
                                 ],
                                 "properties": {
                                     "montant": {
@@ -1015,9 +1010,13 @@
                                         "format": "float",
                                         "example": 30000
                                     },
-                                    "numero_client": {
+                                    "telephone_emetteur_id": {
                                         "type": "string",
                                         "example": "771234567"
+                                    },
+                                    "telephone_recepteur_id": {
+                                        "type": "string",
+                                        "example": "771234568"
                                     },
                                     "note": {
                                         "type": "string",
@@ -1059,30 +1058,33 @@
                 "summary": "Effectuer un paiement (client vers commerçant)",
                 "operationId": "POST::/transactions/paiement::App\\Http\\Controllers\\TransactionController::paiement",
                 "requestBody": {
+                    "description": "Pour effectuer un paiement, vous devez fournir soit le code_marchand soit le telephone_marchand, mais pas les deux en même temps. L'émetteur est automatiquement l'utilisateur connecté. Les paiements par numéro de téléphone incluent des frais de 0.5%.",
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "montant",
-                                    "compte_emetteur_id",
-                                    "compte_recepteur_id"
+                                    "montant"
                                 ],
                                 "properties": {
                                     "montant": {
+                                        "description": "Montant du paiement",
                                         "type": "number",
                                         "format": "float",
                                         "example": 15000
                                     },
-                                    "compte_emetteur_id": {
+                                    "code_marchand": {
+                                        "description": "Code unique du marchand (paiement sans frais supplémentaires)",
                                         "type": "string",
-                                        "example": "uuid-compte-client"
+                                        "example": "MARCHAND123"
                                     },
-                                    "compte_recepteur_id": {
+                                    "telephone_marchand": {
+                                        "description": "Numéro de téléphone du marchand (paiement avec frais de 0.5%)",
                                         "type": "string",
-                                        "example": "uuid-compte-commercant"
+                                        "example": "771234568"
                                     },
                                     "note": {
+                                        "description": "Note optionnelle",
                                         "type": "string",
                                         "example": "Paiement de produit"
                                     }
@@ -1155,20 +1157,22 @@
                 ]
             }
         },
-        "/admin/users/{id}/approve": {
+        "/admin/users/{telephone}/approve": {
             "post": {
                 "tags": [
                     "Administration"
                 ],
-                "summary": "Approuver un utilisateur",
+                "summary": "Approuver un utilisateur par numéro de téléphone",
                 "operationId": "approveUser",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "telephone",
                         "in": "path",
+                        "description": "Numéro de téléphone de l'utilisateur à approuver",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "770000040"
                         }
                     }
                 ],
@@ -1207,20 +1211,22 @@
                 ]
             }
         },
-        "/admin/users/{id}/reject": {
+        "/admin/users/{telephone}/reject": {
             "post": {
                 "tags": [
                     "Administration"
                 ],
-                "summary": "Rejeter un utilisateur",
+                "summary": "Rejeter un utilisateur par numéro de téléphone",
                 "operationId": "rejectUser",
                 "parameters": [
                     {
-                        "name": "id",
+                        "name": "telephone",
                         "in": "path",
+                        "description": "Numéro de téléphone de l'utilisateur à rejeter",
                         "required": true,
                         "schema": {
-                            "type": "string"
+                            "type": "string",
+                            "example": "770000040"
                         }
                     }
                 ],
@@ -1546,11 +1552,6 @@
                                         "otp_sent": {
                                             "type": "boolean",
                                             "example": true
-                                        },
-                                        "otp_code": {
-                                            "description": "Code OTP (en développement)",
-                                            "type": "string",
-                                            "example": "123456"
                                         }
                                     },
                                     "type": "object"
@@ -2049,6 +2050,12 @@
                         "type": "number",
                         "format": "float",
                         "example": 50000
+                    },
+                    "frais": {
+                        "description": "Frais appliqués à la transaction",
+                        "type": "number",
+                        "format": "float",
+                        "example": 7.5
                     },
                     "reference": {
                         "type": "string",

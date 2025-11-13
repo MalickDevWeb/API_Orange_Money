@@ -56,8 +56,8 @@ Route::middleware(T::passport->value)->group(function () {
 // Routes d'administration
 Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::get('users/pending', [AdminController::class, 'getPendingUsers']);
-    Route::post('users/{id}/approve', [AdminController::class, 'approveUser']);
-    Route::post('users/{id}/reject', [AdminController::class, 'rejectUser']);
+    Route::post('users/{telephone}/approve', [AdminController::class, 'approveUser']);
+    Route::post('users/{telephone}/reject', [AdminController::class, 'rejectUser']);
     Route::get('balance-requests/pending', [AdminController::class, 'getPendingBalanceRequests']);
     Route::post('balance-requests/{id}/approve', [AdminController::class, 'approveBalanceRequest']);
     Route::post('balance-requests/{id}/reject', [AdminController::class, 'rejectBalanceRequest']);

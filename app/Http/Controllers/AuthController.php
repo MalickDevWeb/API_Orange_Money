@@ -115,8 +115,7 @@ class AuthController extends Controller
      *             @OA\Property(property="requires_otp", type="boolean", example=true),
      *             @OA\Property(property="email", type="string", example="user@example.com"),
      *             @OA\Property(property="phone_number", type="string", example="705334611"),
-     *             @OA\Property(property="otp_sent", type="boolean", example=true),
-     *             @OA\Property(property="otp_code", type="string", example="123456", description="Code OTP (uniquement en développement)")
+     *             @OA\Property(property="otp_sent", type="boolean", example=true)
      *         )
      *     ),
      *     @OA\Response(response=401, description="Numéro de téléphone non trouvé"),
@@ -135,12 +134,8 @@ class AuthController extends Controller
                 'email' => $result['email'],
                 'phone_number' => $result['phone_number'],
                 'otp_sent' => $result['otp_sent'] ?? false
+                // OTP code is sent via email/SMS only for security - never returned in response
             ];
-
-            // Include OTP code in development
-            if (isset($result['otp_code'])) {
-                $responseData['otp_code'] = $result['otp_code'];
-            }
 
             return $this->successResponse($responseData, $result['message']);
         } catch (\Exception $e) {
@@ -161,8 +156,7 @@ class AuthController extends Controller
      *         @OA\JsonContent(
      *             @OA\Property(property="status", type="string", example="success"),
      *             @OA\Property(property="message", type="string", example="OTP de déconnexion envoyé"),
-     *             @OA\Property(property="otp_sent", type="boolean", example=true),
-     *             @OA\Property(property="otp_code", type="string", example="123456", description="Code OTP (en développement)")
+     *             @OA\Property(property="otp_sent", type="boolean", example=true)
      *         )
      *     ),
      *     @OA\Response(response=401, description="Non autorisé")
@@ -174,12 +168,8 @@ class AuthController extends Controller
             $result = $this->authService->sendLogoutOtp();
             $responseData = [
                 'otp_sent' => $result['otp_sent'] ?? false
+                // OTP code is sent via email/SMS only for security - never returned in response
             ];
-
-            // Include OTP code in development
-            if (isset($result['otp_code'])) {
-                $responseData['otp_code'] = $result['otp_code'];
-            }
 
             return $this->successResponse($responseData, $result['message']);
         } catch (\Exception $e) {

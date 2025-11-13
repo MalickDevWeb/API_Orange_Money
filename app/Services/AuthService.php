@@ -101,8 +101,8 @@ class AuthService implements AuthInterfaceService
                  'email' => $user->email,
                  'phone_number' => $user->telephone,
                  'message' => $message,
-                 'otp_sent' => $otpSent,
-                 'otp_code' => app()->environment('local') ? $otp->code : null // Include OTP for testing in local environment
+                 'otp_sent' => $otpSent
+                 // OTP code is sent via email/SMS only for security - never returned in response
              ];
 
              return $response;
@@ -196,8 +196,8 @@ class AuthService implements AuthInterfaceService
 
             $response = [
                 'message' => $message,
-                'otp_sent' => $otpSent,
-                'otp_code' => app()->environment('local') ? $otp->code : null // Include OTP for testing in local environment
+                'otp_sent' => $otpSent
+                // OTP code is sent via email/SMS only for security - never returned in response
             ];
 
             return $response;
