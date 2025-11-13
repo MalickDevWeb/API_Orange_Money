@@ -117,6 +117,7 @@
         <div class="content">
             <h2>{{ $message }}</h2>
 
+            @if($transaction)
             <div class="amount">
                 {{ number_format($transaction->montant, 0, ',', ' ') }} FCFA
             </div>
@@ -149,6 +150,7 @@
                 </div>
                 @endif
             </div>
+            @endif
 
             @if($role === 'sender')
                 <div class="warning">

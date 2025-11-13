@@ -15,6 +15,7 @@ use App\Enums\UserType;
 use App\Enums\{UserStatus, BalanceRequestStatus, TransactionType, TransactionStatus};
 use App\Enums\T;
 use App\Services\AdminService;
+use App\Interfaces\Services\CompteServiceInterface;
 use App\Http\Requests\UpdateUserRightsRequest;
 use App\Http\Requests\UpdateGlobalFeesRequest;
 use App\Http\Requests\SetUserTaxRequest;
@@ -54,10 +55,12 @@ class AdminController extends Controller
     use ApiResponseTrait, TryCatchTrait, PaginatedSortedTrait;
 
     protected AdminService $adminService;
+    protected CompteServiceInterface $compteService;
 
-    public function __construct(AdminService $adminService)
+    public function __construct(AdminService $adminService, CompteServiceInterface $compteService)
     {
         $this->adminService = $adminService;
+        $this->compteService = $compteService;
         $this->middleware(T::passport->value);
         $this->middleware(function ($request, $next) {
             if (Auth::user()->type !== UserType::ADMIN->value) {
@@ -69,7 +72,7 @@ class AdminController extends Controller
 
     protected function getAllowedSortFields()
     {
-        return ['created_at', 'updated_at', 'numero_compte', 'solde', 'statut'];
+        return ['created_at', 'updated_at', 'numero_compte', 'statut'];
     }
 
     /**
@@ -761,6 +764,79 @@ class AdminController extends Controller
      *     @OA\Response(response=403, description="Accès non autorisé - Réservé aux administrateurs")
      * )
      */
+    /**
+     * @OA\Post(
+     *     path="/admin/users/{user}/comptes",
+     *     operationId="createCompteForUser",
+     *     tags={"Administration"},
+     *     summary="Créer un compte pour un utilisateur spécifique (Admin uniquement)",
+     *     description="Permet à l'administrateur de créer un compte secondaire pour un utilisateur existant.",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="user",
+     *         in="path",
+     *         required=true,
+     *         description="ID de l'utilisateur",
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"nom_compte"},
+     *             @OA\Property(property="nom_compte", type="string", example="compteprive", description="Nom unique du compte secondaire")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=201,
+     *         description="Compte créé avec succès",
+     *         @OA\JsonContent(ref="#/components/schemas/Compte")
+     *     ),
+     *     @OA\Response(response=400, description="Nom de compte déjà utilisé ou réservé"),
+     *     @OA\Response(response=403, description="Accès non autorisé"),
+     *     @OA\Response(response=404, description="Utilisateur non trouvé")
+     * )
+     */
+    public function createCompteForUser(Request $request, User $user)
+    {
+        try {
+            // Validation pour comptes secondaires : seulement nom_compte requis
+            $request->validate([
+                'nom_compte' => 'required|string',
+            ]);
+
+            $data = $request->only(['nom_compte']);
+
+            if ($data['nom_compte'] === 'compte principal') {
+                return $this->errorResponse('Le nom "compte principal" est réservé au premier compte créé automatiquement lors de l\'inscription.', 400);
+            }
+
+            // Vérifier que le nom du compte est unique pour cet utilisateur
+            $existingAccountWithName = \App\Models\Compte::where('utilisateur_id', $user->id)
+                                            ->where('nom_compte', $data['nom_compte'])
+                                            ->first();
+            if ($existingAccountWithName) {
+                return $this->errorResponse('Un compte avec ce nom existe déjà pour cet utilisateur.', 400);
+            }
+
+            // Auto-générer tous les champs requis pour les comptes secondaires
+            $data['numero_compte'] = 'CMPT-' . strtoupper(uniqid());
+            $data['client_id'] = $user->id; // Utilise l'ID de l'utilisateur comme client_id
+            $data['type_compte'] = 'courant'; // Type par défaut
+            $data['devise'] = 'XOF'; // Devise par défaut
+            $data['statut'] = 'inactif'; // Les comptes secondaires sont créés inactifs
+            $data['titulaire'] = $user->nom . ' ' . $user->prenom; // Nom complet de l'utilisateur
+            $data['utilisateur_id'] = $user->id;
+
+            $compte = $this->compteService->create($data);
+
+            $this->adminService->logAdminAction(Auth::id(), 'create_compte_for_user', $user->id, $data);
+
+            return $this->respondCreated($compte, 'Compte secondaire "' . $data['nom_compte'] . '" créé avec succès pour l\'utilisateur.');
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage());
+        }
+    }
+
     public function getAllComptes(Request $request)
     {
         try {
@@ -771,14 +847,7 @@ class AdminController extends Controller
                 $query->where('statut', $request->statut);
             }
 
-            // Filtre par solde (plage)
-            if ($request->has('solde_min') && is_numeric($request->solde_min)) {
-                $query->where('solde', '>=', $request->solde_min);
-            }
-
-            if ($request->has('solde_max') && is_numeric($request->solde_max)) {
-                $query->where('solde', '<=', $request->solde_max);
-            }
+            // Note: Solde filtering removed as solde is now calculated
 
             // Filtre par numéro de compte
             if ($request->has('numero_compte') && !empty($request->numero_compte)) {

@@ -6,10 +6,12 @@ use App\Models\Transaction;
 use App\Models\Compte;
 use App\Models\User;
 use App\Services\TransactionService;
+use App\Interfaces\Notifications\BrevoServiceInterface;
 use App\Traits\ApiResponseTrait;
 use App\Traits\PaginatedSortedTrait;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
 
 /**
  * @OA\Tag(
@@ -69,10 +71,12 @@ class TransactionController extends Controller
     use ApiResponseTrait, PaginatedSortedTrait;
 
     protected TransactionService $transactionService;
+    protected BrevoServiceInterface $brevoService;
 
-    public function __construct(TransactionService $transactionService)
+    public function __construct(TransactionService $transactionService, BrevoServiceInterface $brevoService)
     {
         $this->transactionService = $transactionService;
+        $this->brevoService = $brevoService;
     }
 
     protected function getAllowedSortFields()
@@ -286,34 +290,31 @@ class TransactionController extends Controller
     }
 
     /**
-     * @OA\Post(
-     *     path="/api/transactions",
-     *     tags={"Transactions"},
-     *     summary="Créer une nouvelle transaction avec contrôles administratifs",
-     *     description="Crée une transaction en appliquant automatiquement les contrôles administratifs : vérification des droits utilisateur, bannissement, taxes personnalisées, et frais globaux.",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"type","montant"},
-     *             @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
-     *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de base (hors frais et taxes)"),
-     *             @OA\Property(property="reference", type="string", example="TXN-123456"),
-     *             @OA\Property(property="note", type="string", example="Paiement de facture"),
-     *             @OA\Property(property="telephone_emetteur_id", type="string", example="771234567"),
-     *             @OA\Property(property="telephone_recepteur_id", type="string", example="771234568")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Transaction créée avec succès (contrôles admin appliqués)",
-     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
-     *     ),
-     *     @OA\Response(response=403, description="Transaction refusée - Droits insuffisants ou compte banni"),
-     *     @OA\Response(response=400, description="Solde insuffisant (incluant frais et taxes)"),
-     *     @OA\Response(response=422, description="Données invalides")
-     * )
-     */
+      * @OA\Post(
+      *     path="/transactions/depot",
+      *     tags={"Transactions"},
+      *     summary="Effectuer un dépôt sur le compte d'un client",
+      *     description="Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients. Les fournisseurs doivent fournir leur PIN pour plus de sécurité.",
+      *     security={{"bearerAuth":{}}},
+      *     @OA\RequestBody(
+      *         required=true,
+      *         @OA\JsonContent(
+      *             required={"montant","telephone_recepteur_id"},
+      *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant du dépôt"),
+      *             @OA\Property(property="telephone_recepteur_id", type="string", example="771234567", description="Numéro de téléphone du destinataire"),
+      *             @OA\Property(property="pin", type="string", example="1234", description="PIN du fournisseur (requis pour les fournisseurs)"),
+      *             @OA\Property(property="note", type="string", example="Dépôt client")
+      *         )
+      *     ),
+      *     @OA\Response(
+      *         response=201,
+      *         description="Dépôt effectué avec succès",
+      *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+      *     ),
+      *     @OA\Response(response=403, description="PIN incorrect ou accès non autorisé"),
+      *     @OA\Response(response=404, description="Utilisateur destinataire non trouvé")
+      * )
+      */
     public function store(Request $request)
     {
         try {
@@ -642,11 +643,26 @@ class TransactionController extends Controller
     public function depot(Request $request)
     {
         try {
+            /** @var \App\Models\User $authenticatedUser */
+            $authenticatedUser = auth()->user();
+
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
                 'telephone_recepteur_id' => 'required|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
+
+            // Validation supplémentaire pour les fournisseurs
+            if ($authenticatedUser->isFournisseur()) {
+                $request->validate([
+                    'pin' => 'required|string|size:4',
+                ]);
+
+                // Vérifier le PIN du fournisseur
+                if (!$authenticatedUser->pin || !\Illuminate\Support\Facades\Hash::check($request->pin, $authenticatedUser->pin)) {
+                    return $this->errorResponse('PIN incorrect', 403);
+                }
+            }
 
             // Trouver le compte récepteur par numéro de téléphone
             $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur_id'])->first();
@@ -658,15 +674,28 @@ class TransactionController extends Controller
                 return $this->errorResponse('Aucun compte trouvé pour l\'utilisateur destinataire', 404);
             }
 
-            // Pour un dépôt, l'émetteur est null (système/admin)
+            // Pour un dépôt, l'émetteur est null (système/admin) ou le fournisseur authentifié
             $data['type'] = 'depot';
-            $data['compte_emetteur_id'] = null;
+            $data['compte_emetteur_id'] = null; // Système pour dépôt
             $data['compte_recepteur_id'] = $compteRecepteur->id;
             $data['reference'] = 'DEP-' . strtoupper(uniqid());
             $data['statut'] = 'reussie';
             $data['date_transaction'] = now();
 
             $transaction = $this->transactionService->create($data);
+
+            // Envoyer un email de confirmation au destinataire
+            if ($userRecepteur->email) {
+                $subject = "Dépôt reçu - {$transaction->reference}";
+                $message = "Vous avez reçu un dépôt de {$transaction->montant} FCFA.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => $transaction,
+                    'message' => $message,
+                    'role' => 'receiver'
+                ])->render();
+                $this->brevoService->sendMail($userRecepteur->email, $subject, $htmlContent);
+            }
+
             return $this->respondCreated($transaction, 'Dépôt effectué avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -699,14 +728,29 @@ class TransactionController extends Controller
     public function retrait(Request $request)
     {
         try {
+            /** @var \App\Models\User $authenticatedUser */
+            $authenticatedUser = auth()->user();
+
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
-                'telephone_emetteur_id' => 'required|string|exists:users,telephone',
+                'telephone_emetteur' => 'nullable|string|exists:users,telephone',
                 'note' => 'nullable|string',
             ]);
 
-            // Trouver le compte émetteur par numéro de téléphone
-            $userEmetteur = \App\Models\User::where('telephone', $data['telephone_emetteur_id'])->first();
+            // Déterminer l'émetteur
+            if ($authenticatedUser->isFournisseur()) {
+                // Fournisseur initie un retrait pour un client
+                if (empty($data['telephone_emetteur'])) {
+                    return $this->errorResponse('Numéro de téléphone du client requis', 400);
+                }
+                $telephoneEmetteur = $data['telephone_emetteur'];
+            } else {
+                // Client retire de son propre compte
+                $telephoneEmetteur = $authenticatedUser->telephone;
+            }
+
+            // Trouver l'utilisateur émetteur
+            $userEmetteur = \App\Models\User::where('telephone', $telephoneEmetteur)->first();
             if (!$userEmetteur) {
                 return $this->errorResponse('Utilisateur émetteur non trouvé', 404);
             }
@@ -717,21 +761,223 @@ class TransactionController extends Controller
 
             // Vérifier le solde du compte
             if ($compteEmetteur->solde < $data['montant']) {
+                // Envoyer des emails d'erreur
+                $this->sendInsufficientBalanceEmails($userEmetteur, $authenticatedUser, $data['montant']);
                 return $this->errorResponse('Solde insuffisant pour effectuer ce retrait', 400);
             }
 
-            // Pour un retrait, le récepteur est null (système/admin)
-            $data['type'] = 'retrait';
-            $data['compte_emetteur_id'] = $compteEmetteur->id;
-            $data['compte_recepteur_id'] = null;
-            $data['reference'] = 'RET-' . strtoupper(uniqid());
-            $data['statut'] = 'reussie';
-            $data['date_transaction'] = now();
+            // Préparer les données de transaction
+            $transactionData = [
+                'type' => 'retrait',
+                'montant' => $data['montant'],
+                'note' => $data['note'] ?? 'Retrait d\'argent',
+                'compte_emetteur_id' => $compteEmetteur->id,
+                'compte_recepteur_id' => null,
+                'reference' => 'RET-' . strtoupper(uniqid()),
+                'date_transaction' => now(),
+            ];
 
-            $transaction = $this->transactionService->create($data);
-            return $this->respondCreated($transaction, 'Retrait effectué avec succès');
+            if ($authenticatedUser->isFournisseur() && $telephoneEmetteur !== $authenticatedUser->telephone) {
+                // Fournisseur initie retrait pour client : transaction en attente, envoyer OTP
+                $transactionData['statut'] = 'pending';
+
+                $transaction = $this->transactionService->create($transactionData);
+
+                // Générer et envoyer OTP par email au client
+                $otpCode = str_pad(random_int(0, 999999), 6, '0', STR_PAD_LEFT);
+                \App\Models\OtpCode::create([
+                    'user_id' => $userEmetteur->id,
+                    'phone_number' => $userEmetteur->telephone,
+                    'code' => $otpCode,
+                    'type' => 'confirm_retrait',
+                    'data' => [
+                        'transaction_id' => $transaction->id,
+                        'montant' => $data['montant'],
+                        'fournisseur_id' => $authenticatedUser->id,
+                    ],
+                    'expires_at' => now()->addMinutes(10),
+                ]);
+
+                // Envoyer l'OTP par email au client
+                if ($userEmetteur->email) {
+                    $subject = "Code de confirmation de retrait - {$transaction->reference}";
+                    $message = "Voici votre code de retrait : {$otpCode}. Montant : {$data['montant']} FCFA. Ce code expire dans 10 minutes.";
+                    $htmlContent = View::make('emails.transaction-notification', [
+                        'transaction' => $transaction,
+                        'message' => $message,
+                        'role' => 'confirmation'
+                    ])->render();
+                    $this->brevoService->sendMail($userEmetteur->email, $subject, $htmlContent);
+                }
+
+                // Envoyer un email au fournisseur
+                if ($authenticatedUser->email) {
+                    $subject = "Retrait initié - {$transaction->reference}";
+                    $message = "Vous avez initié un retrait de {$data['montant']} FCFA pour le client {$userEmetteur->nom} {$userEmetteur->prenom}. En attente de confirmation du client.";
+                    $htmlContent = View::make('emails.transaction-notification', [
+                        'transaction' => $transaction,
+                        'message' => $message,
+                        'role' => 'supplier'
+                    ])->render();
+                    $this->brevoService->sendMail($authenticatedUser->email, $subject, $htmlContent);
+                }
+
+                return $this->successResponse([
+                    'transaction_id' => $transaction->id,
+                    'requires_confirmation' => true,
+                ], 'Retrait initié. Code de confirmation envoyé par email au client.', 201);
+            } else {
+                // Retrait direct (client ou fournisseur pour lui-même)
+                $transactionData['statut'] = 'reussie';
+                $transaction = $this->transactionService->create($transactionData);
+                return $this->respondCreated($transaction, 'Retrait effectué avec succès');
+            }
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
+        }
+    }
+
+    /**
+     * @OA\Post(
+     *     path="/transactions/confirm-retrait",
+     *     tags={"Transactions"},
+     *     summary="Confirmer un retrait initié par un fournisseur",
+     *     description="Le fournisseur entre le code OTP fourni par le client pour confirmer le retrait.",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"confirmation_code"},
+     *             @OA\Property(property="confirmation_code", type="string", example="123456")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Retrait confirmé avec succès",
+     *         @OA\JsonContent(ref="#/components/schemas/Transaction")
+     *     ),
+     *     @OA\Response(response=400, description="Code invalide ou expiré"),
+     *     @OA\Response(response=403, description="Accès non autorisé"),
+     *     @OA\Response(response=404, description="Transaction non trouvée")
+     * )
+     */
+    public function confirmRetrait(Request $request)
+    {
+        try {
+            /** @var \App\Models\User $authenticatedUser */
+            $authenticatedUser = auth()->user();
+
+            $data = $request->validate([
+                'confirmation_code' => 'required|string|size:6',
+            ]);
+
+            // Trouver l'OTP valide pour ce fournisseur
+            $otpCode = \App\Models\OtpCode::where('code', $data['confirmation_code'])
+                                          ->where('type', 'confirm_retrait')
+                                          ->whereJsonContains('data->fournisseur_id', $authenticatedUser->id)
+                                          ->first();
+
+            if (!$otpCode || $otpCode->isExpired()) {
+                return $this->errorResponse('Code de confirmation invalide ou expiré', 400);
+            }
+
+            // Récupérer l'ID de la transaction depuis les données OTP
+            $transactionId = $otpCode->data['transaction_id'];
+
+            // Trouver la transaction
+            $transaction = \App\Models\Transaction::find($transactionId);
+            if (!$transaction || $transaction->type !== 'retrait' || $transaction->statut !== 'pending') {
+                return $this->errorResponse('Transaction non trouvée ou déjà confirmée', 404);
+            }
+
+            // Marquer l'OTP comme utilisé
+            $otpCode->markAsUsed();
+
+            // Confirmer la transaction
+            $transaction->update(['statut' => 'reussie']);
+
+            // Envoyer les emails de confirmation
+            $this->sendRetraitConfirmationEmails($transaction, $authenticatedUser);
+
+            return $this->successResponse($transaction, 'Retrait confirmé avec succès');
+        } catch (\Exception $e) {
+            return $this->errorResponse($e->getMessage());
+        }
+    }
+
+    protected function sendInsufficientBalanceEmails(User $client, User $fournisseur, float $montant): void
+    {
+        try {
+            \Illuminate\Support\Facades\Log::info('Envoi d\'emails d\'erreur solde insuffisant', [
+                'client_email' => $client->email,
+                'fournisseur_email' => $fournisseur->email,
+                'montant' => $montant
+            ]);
+
+            // Email au client
+            if ($client->email) {
+                $subject = "Tentative de retrait - Solde insuffisant";
+                $message = "Une tentative de retrait de {$montant} FCFA a échoué en raison d'un solde insuffisant. Veuillez consulter votre solde.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'error'
+                ])->render();
+                $result = $this->brevoService->sendMail($client->email, $subject, $htmlContent);
+                \Illuminate\Support\Facades\Log::info('Email envoyé au client', ['email' => $client->email, 'result' => $result]);
+            }
+
+            // Email au fournisseur
+            if ($fournisseur->email) {
+                $subject = "Tentative de retrait - Solde insuffisant";
+                $message = "La tentative de retrait de {$montant} FCFA pour le client {$client->nom} {$client->prenom} a échoué en raison d'un solde insuffisant.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'error'
+                ])->render();
+                $result = $this->brevoService->sendMail($fournisseur->email, $subject, $htmlContent);
+                \Illuminate\Support\Facades\Log::info('Email envoyé au fournisseur', ['email' => $fournisseur->email, 'result' => $result]);
+            }
+        } catch (\Exception $e) {
+            // Log l'erreur mais ne pas interrompre la réponse
+            \Illuminate\Support\Facades\Log::error('Erreur lors de l\'envoi d\'emails d\'erreur de solde insuffisant: ' . $e->getMessage());
+        }
+    }
+
+    protected function sendRetraitConfirmationEmails(Transaction $transaction, User $fournisseur): void
+    {
+        try {
+            // Email au client (émetteur)
+            if ($transaction->compteEmetteur && $transaction->compteEmetteur->utilisateur) {
+                $client = $transaction->compteEmetteur->utilisateur;
+                if ($client->email) {
+                    $soldeActuel = $transaction->compteEmetteur->solde;
+                    $subject = "Confirmation de retrait - {$transaction->reference}";
+                    $message = "Votre retrait de {$transaction->montant} FCFA a été confirmé avec succès. Solde actuel : {$soldeActuel} FCFA.";
+                    $htmlContent = View::make('emails.transaction-notification', [
+                        'transaction' => $transaction,
+                        'message' => $message,
+                        'role' => 'sender'
+                    ])->render();
+                    $this->brevoService->sendMail($client->email, $subject, $htmlContent);
+                }
+            }
+
+            // Email au fournisseur
+            if ($fournisseur->email) {
+                $subject = "Confirmation de retrait effectué - {$transaction->reference}";
+                $message = "Le retrait de {$transaction->montant} FCFA pour le client {$transaction->compteEmetteur->utilisateur->nom} {$transaction->compteEmetteur->utilisateur->prenom} a été confirmé avec succès.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => $transaction,
+                    'message' => $message,
+                    'role' => 'supplier'
+                ])->render();
+                $this->brevoService->sendMail($fournisseur->email, $subject, $htmlContent);
+            }
+        } catch (\Exception $e) {
+            // Log l'erreur mais ne pas interrompre la réponse
+            \Illuminate\Support\Facades\Log::error('Erreur lors de l\'envoi d\'emails de confirmation de retrait: ' . $e->getMessage());
         }
     }
 
@@ -1027,16 +1273,14 @@ class TransactionController extends Controller
      *     path="/transactions/unified",
      *     tags={"Transactions"},
      *     summary="Transaction unifiée intelligente - Détection automatique du type selon l'émetteur et le destinataire",
-     *     description="Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur par défaut est l'utilisateur connecté, mais peut être spécifié.",
+     *     description="Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur est toujours l'utilisateur connecté. La note est générée automatiquement.",
      *     security={{"bearerAuth":{}}},
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"montant","telephone_recepteur"},
      *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de la transaction"),
-     *             @OA\Property(property="telephone_recepteur", type="string", example="771234567", description="Numéro de téléphone du destinataire"),
-     *             @OA\Property(property="telephone_emetteur", type="string", example="771234568", description="Numéro de téléphone de l'émetteur (optionnel, par défaut utilisateur connecté)"),
-     *             @OA\Property(property="note", type="string", example="Transaction unifiée")
+     *             @OA\Property(property="telephone_recepteur", type="string", example="771234567", description="Numéro de téléphone du destinataire")
      *         )
      *     ),
      *     @OA\Response(
@@ -1059,12 +1303,10 @@ class TransactionController extends Controller
             $data = $request->validate([
                 'montant' => 'required|numeric|min:0.01',
                 'telephone_recepteur' => 'required|string|exists:users,telephone',
-                'telephone_emetteur' => 'nullable|string|exists:users,telephone',
-                'note' => 'nullable|string',
             ]);
 
-            // Déterminer l'émetteur : si spécifié, utiliser celui-là, sinon l'utilisateur connecté
-            $telephoneEmetteur = $data['telephone_emetteur'] ?? $authenticatedUser->telephone;
+            // L'émetteur est toujours l'utilisateur connecté
+            $telephoneEmetteur = $authenticatedUser->telephone;
 
             // Vérifier que l'émetteur et le récepteur sont différents
             if ($telephoneEmetteur === $data['telephone_recepteur']) {
@@ -1072,11 +1314,7 @@ class TransactionController extends Controller
             }
 
             // Trouver les utilisateurs
-            $userEmetteur = \App\Models\User::where('telephone', $telephoneEmetteur)->first();
-            if (!$userEmetteur) {
-                return $this->errorResponse('Émetteur non trouvé', 404);
-            }
-
+            $userEmetteur = $authenticatedUser;
             $userRecepteur = \App\Models\User::where('telephone', $data['telephone_recepteur'])->first();
             if (!$userRecepteur) {
                 return $this->errorResponse('Destinataire non trouvé', 404);
@@ -1098,6 +1336,14 @@ class TransactionController extends Controller
             } elseif ($userEmetteur->isClient() && $userRecepteur->isCommercant()) {
                 $typeTransaction = 'paiement';
             }
+
+            // Générer la note automatiquement
+            $note = match($typeTransaction) {
+                'depot' => 'Dépôt vers ' . $data['telephone_recepteur'],
+                'transfert' => 'Transfert vers ' . $data['telephone_recepteur'],
+                'paiement' => 'Paiement vers ' . $data['telephone_recepteur'],
+                default => 'Transaction unifiée'
+            };
 
             // Trouver les comptes
             $compteEmetteur = $userEmetteur->comptes->first();
@@ -1150,6 +1396,8 @@ class TransactionController extends Controller
             // Vérifier le solde pour les transactions qui débitent un compte
             if ($typeTransaction !== 'depot') {
                 if ($compteEmetteur->solde < $montantTotal) {
+                    // Envoyer des emails d'erreur aux deux parties
+                    $this->sendTransactionErrorEmails($userEmetteur, $userRecepteur, $data['montant'], 'Solde insuffisant pour effectuer cette transaction');
                     return $this->errorResponse('Solde insuffisant pour effectuer cette transaction', 400);
                 }
             }
@@ -1163,7 +1411,7 @@ class TransactionController extends Controller
             $transactionData = [
                 'type' => $typeTransaction,
                 'montant' => $data['montant'],
-                'note' => $data['note'],
+                'note' => $note,
                 'compte_emetteur_id' => $compteEmetteur->id,
                 'compte_recepteur_id' => $compteRecepteur->id,
                 'statut' => 'reussie',

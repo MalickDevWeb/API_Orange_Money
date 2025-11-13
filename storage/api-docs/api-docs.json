@@ -359,9 +359,9 @@
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Lister tous les comptes avec filtrage avancé (Admin uniquement)",
-                "description": "Liste paginée de tous les comptes avec possibilité de filtrer par statut, solde, numéro de compte, titulaire et recherche globale. Tri possible par tous les champs principaux.",
-                "operationId": "getComptes",
+                "summary": "Lister les comptes de l'utilisateur connecté",
+                "description": "Affiche tous les comptes de l'utilisateur connecté avec le compte actif en premier par défaut. Possibilité de filtrer par statut, solde, numéro de compte, etc.",
+                "operationId": "GET::/comptes::App\\Http\\Controllers\\CompteController::index",
                 "parameters": [
                     {
                         "name": "statut",
@@ -478,7 +478,7 @@
                                         },
                                         "message": {
                                             "type": "string",
-                                            "example": "Comptes récupérés avec succès"
+                                            "example": "Vos comptes récupérés avec succès"
                                         },
                                         "data": {
                                             "properties": {
@@ -510,6 +510,10 @@
                                                                 "type": "string",
                                                                 "example": "MRC001",
                                                                 "nullable": true
+                                                            },
+                                                            "qr_code": {
+                                                                "type": "string",
+                                                                "nullable": true
                                                             }
                                                         },
                                                         "type": "object"
@@ -530,8 +534,8 @@
                             }
                         }
                     },
-                    "403": {
-                        "description": "Accès non autorisé - Réservé aux administrateurs"
+                    "401": {
+                        "description": "Non autorisé"
                     }
                 },
                 "security": [
@@ -1320,7 +1324,7 @@
                     "Transactions"
                 ],
                 "summary": "Transaction unifiée intelligente - Détection automatique du type selon l'émetteur et le destinataire",
-                "description": "Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur par défaut est l'utilisateur connecté, mais peut être spécifié.",
+                "description": "Endpoint unique qui détecte automatiquement le type de transaction selon la matrice : Admin→Fournisseur=Dépôt, Fournisseur→Client=Dépôt, Client→Client=Transfert, Client→Commerçant=Paiement. L'émetteur est toujours l'utilisateur connecté. La note est générée automatiquement.",
                 "operationId": "POST::/transactions/unified::App\\Http\\Controllers\\TransactionController::unifiedTransaction",
                 "requestBody": {
                     "required": true,
@@ -1342,15 +1346,6 @@
                                         "description": "Numéro de téléphone du destinataire",
                                         "type": "string",
                                         "example": "771234567"
-                                    },
-                                    "telephone_emetteur": {
-                                        "description": "Numéro de téléphone de l'émetteur (optionnel, par défaut utilisateur connecté)",
-                                        "type": "string",
-                                        "example": "771234568"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Transaction unifiée"
                                     }
                                 },
                                 "type": "object"
@@ -2142,6 +2137,74 @@
                 ]
             }
         },
+        "/admin/users/{user}/comptes": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Créer un compte pour un utilisateur spécifique (Admin uniquement)",
+                "description": "Permet à l'administrateur de créer un compte secondaire pour un utilisateur existant.",
+                "operationId": "createCompteForUser",
+                "parameters": [
+                    {
+                        "name": "user",
+                        "in": "path",
+                        "description": "ID de l'utilisateur",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nom_compte"
+                                ],
+                                "properties": {
+                                    "nom_compte": {
+                                        "description": "Nom unique du compte secondaire",
+                                        "type": "string",
+                                        "example": "compteprive"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Compte créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Compte"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Nom de compte déjà utilisé ou réservé"
+                    },
+                    "403": {
+                        "description": "Accès non autorisé"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/logout/otp": {
             "get": {
                 "tags": [
@@ -2262,19 +2325,8 @@
                     "Comptes"
                 ],
                 "summary": "Afficher les comptes de l'utilisateur connecté",
-                "description": "Pour les utilisateurs non-administrateurs, le compte actif apparaît en premier dans la liste. Pour les administrateurs, tous les comptes sont affichés sans ordre particulier.",
+                "description": "Affiche tous les comptes de l'utilisateur connecté avec le compte actif en premier par défaut.",
                 "operationId": "GET::/comptes/me::App\\Http\\Controllers\\CompteController::me",
-                "parameters": [
-                    {
-                        "name": "all",
-                        "in": "query",
-                        "description": "Inclure tous les comptes (par défaut seulement actifs)",
-                        "required": false,
-                        "schema": {
-                            "type": "boolean"
-                        }
-                    }
-                ],
                 "responses": {
                     "200": {
                         "description": "Comptes récupérés avec succès",
@@ -2421,56 +2473,43 @@
                 ]
             }
         },
-        "/api/transactions": {
+        "/transactions/depot": {
             "post": {
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Créer une nouvelle transaction avec contrôles administratifs",
-                "description": "Crée une transaction en appliquant automatiquement les contrôles administratifs : vérification des droits utilisateur, bannissement, taxes personnalisées, et frais globaux.",
-                "operationId": "POST::/api/transactions::App\\Http\\Controllers\\TransactionController::store",
+                "summary": "Effectuer un dépôt sur le compte d'un client",
+                "description": "Permet aux administrateurs et fournisseurs d'effectuer des dépôts sur les comptes clients. Les fournisseurs doivent fournir leur PIN pour plus de sécurité.",
+                "operationId": "POST::/transactions/depot::App\\Http\\Controllers\\TransactionController::store",
                 "requestBody": {
                     "required": true,
                     "content": {
                         "application/json": {
                             "schema": {
                                 "required": [
-                                    "type",
-                                    "montant"
+                                    "montant",
+                                    "telephone_recepteur_id"
                                 ],
                                 "properties": {
-                                    "type": {
-                                        "type": "string",
-                                        "enum": [
-                                            "depot",
-                                            "retrait",
-                                            "transfert",
-                                            "paiement",
-                                            "achat_virtuel"
-                                        ],
-                                        "example": "transfert"
-                                    },
                                     "montant": {
-                                        "description": "Montant de base (hors frais et taxes)",
+                                        "description": "Montant du dépôt",
                                         "type": "number",
                                         "format": "float",
                                         "example": 50000
                                     },
-                                    "reference": {
-                                        "type": "string",
-                                        "example": "TXN-123456"
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Paiement de facture"
-                                    },
-                                    "telephone_emetteur_id": {
+                                    "telephone_recepteur_id": {
+                                        "description": "Numéro de téléphone du destinataire",
                                         "type": "string",
                                         "example": "771234567"
                                     },
-                                    "telephone_recepteur_id": {
+                                    "pin": {
+                                        "description": "PIN du fournisseur (requis pour les fournisseurs)",
                                         "type": "string",
-                                        "example": "771234568"
+                                        "example": "1234"
+                                    },
+                                    "note": {
+                                        "type": "string",
+                                        "example": "Dépôt client"
                                     }
                                 },
                                 "type": "object"
@@ -2480,7 +2519,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Transaction créée avec succès (contrôles admin appliqués)",
+                        "description": "Dépôt effectué avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2490,13 +2529,65 @@
                         }
                     },
                     "403": {
-                        "description": "Transaction refusée - Droits insuffisants ou compte banni"
+                        "description": "PIN incorrect ou accès non autorisé"
+                    },
+                    "404": {
+                        "description": "Utilisateur destinataire non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/transactions/confirm-retrait": {
+            "post": {
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Confirmer un retrait initié par un fournisseur",
+                "description": "Le fournisseur entre le code OTP fourni par le client pour confirmer le retrait.",
+                "operationId": "POST::/transactions/confirm-retrait::App\\Http\\Controllers\\TransactionController::confirmRetrait",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "confirmation_code"
+                                ],
+                                "properties": {
+                                    "confirmation_code": {
+                                        "type": "string",
+                                        "example": "123456"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Retrait confirmé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Transaction"
+                                }
+                            }
+                        }
                     },
                     "400": {
-                        "description": "Solde insuffisant (incluant frais et taxes)"
+                        "description": "Code invalide ou expiré"
                     },
-                    "422": {
-                        "description": "Données invalides"
+                    "403": {
+                        "description": "Accès non autorisé"
+                    },
+                    "404": {
+                        "description": "Transaction non trouvée"
                     }
                 },
                 "security": [

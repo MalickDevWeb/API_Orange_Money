@@ -24,7 +24,6 @@ class StoreCompteRequest extends FormRequest
     {
         return [
             'numero_compte' => 'required|string|unique:comptes,numero_compte',
-            'solde' => 'required|numeric|min:0',
             'client_id' => 'required|exists:clients,id',
             'type_compte' => 'required|string',
             'devise' => 'required|string',
@@ -38,9 +37,6 @@ class StoreCompteRequest extends FormRequest
             'numero_compte.required' => MessageErreursReqest::NUMERO_COMPTE_REQUIRED->value,
             'numero_compte.string' => MessageErreursReqest::NUMERO_COMPTE_STRING->value,
             'numero_compte.unique' => MessageErreursReqest::NUMERO_COMPTE_UNIQUE->value,
-            'solde.required' => MessageErreursReqest::SOLDE_INITIAL_REQUIRED->value,
-            'solde.numeric' => MessageErreursReqest::SOLDE_INITIAL_NUMERIC->value,
-            'solde.min' => MessageErreursReqest::SOLDE_INITIAL_MIN->value,
             'client_id.required' => MessageErreursReqest::CLIENT_ID_REQUIRED->value,
             'client_id.exists' => MessageErreursReqest::CLIENT_ID_EXISTS->value,
             'type_compte.required' => MessageErreursReqest::TYPE_COMPTE_REQUIRED->value,

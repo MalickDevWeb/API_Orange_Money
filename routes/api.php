@@ -52,6 +52,7 @@ Route::middleware(T::passport->value)->group(function () {
 Route::middleware(T::passport->value)->group(function () {
     Route::apiResource('transactions', \App\Http\Controllers\TransactionController::class);
     Route::post('transactions/retrait', [\App\Http\Controllers\TransactionController::class, 'retrait']);
+    Route::post('transactions/confirm-retrait', [\App\Http\Controllers\TransactionController::class, 'confirmRetrait']);
     Route::post('transactions/achat-virtuel', [\App\Http\Controllers\TransactionController::class, 'achatVirtuel']);
     Route::post('transactions/unified', [\App\Http\Controllers\TransactionController::class, 'unifiedTransaction']);
 });
@@ -65,6 +66,8 @@ Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::post('users/{user}/ban', [AdminController::class, 'banUser']);
     Route::post('users/{user}/unban', [AdminController::class, 'unbanUser']);
     Route::put('users/{user}/tax', [AdminController::class, 'setUserTax']);
+    Route::post('users/{user}/comptes', [AdminController::class, 'createCompteForUser']);
+    Route::get('comptes', [AdminController::class, 'getAllComptes']);
     Route::get('statistics/daily', [AdminController::class, 'getDailyStatistics']);
     Route::put('fees/global', [AdminController::class, 'updateGlobalFees']);
     Route::get('balance-requests/pending', [AdminController::class, 'getPendingBalanceRequests']);

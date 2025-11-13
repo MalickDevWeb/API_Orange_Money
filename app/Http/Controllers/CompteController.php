@@ -62,7 +62,7 @@ class CompteController extends Controller
 
     protected function getAllowedSortFields()
     {
-        return ['created_at', 'updated_at', 'numero_compte', 'solde', 'statut'];
+        return ['created_at', 'updated_at', 'numero_compte', 'statut'];
     }
 
     /**
@@ -75,14 +75,7 @@ class CompteController extends Controller
             $query->where('statut', $request->statut);
         }
 
-        // Filtre par solde (plage)
-        if ($request->has('solde_min') && is_numeric($request->solde_min)) {
-            $query->where('solde', '>=', $request->solde_min);
-        }
-
-        if ($request->has('solde_max') && is_numeric($request->solde_max)) {
-            $query->where('solde', '<=', $request->solde_max);
-        }
+        // Note: Solde filtering removed as solde is now calculated
 
         // Filtre par numéro de compte
         if ($request->has('numero_compte') && !empty($request->numero_compte)) {
@@ -110,15 +103,8 @@ class CompteController extends Controller
      *     path="/comptes/me",
      *     tags={"Comptes"},
      *     summary="Afficher les comptes de l'utilisateur connecté",
-     *     description="Pour les utilisateurs non-administrateurs, le compte actif apparaît en premier dans la liste. Pour les administrateurs, tous les comptes sont affichés sans ordre particulier.",
+     *     description="Affiche tous les comptes de l'utilisateur connecté avec le compte actif en premier par défaut.",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="all",
-     *         in="query",
-     *         required=false,
-     *         @OA\Schema(type="boolean"),
-     *         description="Inclure tous les comptes (par défaut seulement actifs)"
-     *     ),
      *     @OA\Response(
      *         response=200,
      *         description="Comptes récupérés avec succès",
@@ -150,10 +136,6 @@ class CompteController extends Controller
             }
 
             $query = $user->comptes();
-
-            if (!$request->has('all')) {
-                $query->where('statut', 'actif');
-            }
 
             // Pour les utilisateurs non-admin, trier pour que le compte actif soit en premier
             if ($user->type !== 'admin') {
@@ -501,7 +483,6 @@ class CompteController extends Controller
 
             // Auto-générer tous les champs requis pour les comptes secondaires
             $data['numero_compte'] = 'CMPT-' . strtoupper(uniqid());
-            $data['solde'] = 0; // Solde initial à 0
             $data['client_id'] = $user->id; // Utilise l'ID de l'utilisateur comme client_id
             $data['type_compte'] = 'courant'; // Type par défaut
             $data['devise'] = 'XOF'; // Devise par défaut

@@ -5,8 +5,10 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\DB;
 use App\Utils\GenerateUid;
 use App\Utils\HasTypeAndStatus;
+use App\Enums\TransactionStatus;
 
 // use App\Utils\HasStatus;
 // use App\Utils\HasUserType;
@@ -19,6 +21,7 @@ class Compte extends Model
     protected $fillable = [
         'numero_compte',
         'titulaire',
+        'nom_compte',
         'code_marchand',
         'statut',
         'utilisateur_id',
@@ -44,12 +47,10 @@ class Compte extends Model
 
     public function getSoldeAttribute(): float
     {
-        $emises = $this->transactionsEmises()->sum('montant');
-        $recues = $this->transactionsRecues()->sum('montant');
-
-        return $recues - $emises;
+        $received = $this->transactionsRecues()->where('statut', TransactionStatus::REUSSIE)->sum('montant');
+        $sent = $this->transactionsEmises()->where('statut', TransactionStatus::REUSSIE)->sum(DB::raw('montant + frais'));
+        return $received - $sent;
     }
-
 
     public function getTypeAttribute(): ?string
     {
