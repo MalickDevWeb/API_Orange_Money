@@ -96,17 +96,19 @@ class OtpCode extends Model
      */
     public static function createForUser(string $userId, string $phoneNumber, string $type = 'login', array $data = []): self
     {
-        // Invalider les anciens codes du même type pour cet utilisateur
-        self::where('user_id', $userId)
-            ->where('type', $type)
-            ->whereNull('used_at')
-            ->update(['used_at' => now()]);
+        // Invalider les anciens codes du même type pour cet utilisateur, sauf pour logout et login
+        if ($type !== 'logout' && $type !== 'login') {
+            self::where('user_id', $userId)
+                ->where('type', $type)
+                ->whereNull('used_at')
+                ->update(['used_at' => now()]);
+        }
 
         return self::create([
             'user_id' => $userId,
             'code' => self::generateCode(),
             'phone_number' => $phoneNumber,
-            'expires_at' => now()->addMinutes(30), // Expire dans 30 minutes
+            'expires_at' => now()->addMinutes(7), // Expire dans 7 minutes
             'type' => $type,
             'attempts' => 0,
             'data' => $data,

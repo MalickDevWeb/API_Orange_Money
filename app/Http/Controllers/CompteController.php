@@ -6,6 +6,7 @@ use App\Models\Compte;
 use App\Models\User;
 use App\Interfaces\Services\CompteServiceInterface;
 use App\Http\Requests\StoreCompteRequest;
+use App\Http\Resources\CompteResource;
 use App\Traits\ApiResponseTrait;
 use App\Traits\PaginatedSortedTrait;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ use Illuminate\Http\Request;
  *     schema="Compte",
  *     type="object",
  *     @OA\Property(property="id", type="string", format="uuid", example="uuid-compte"),
- *     @OA\Property(property="numero_compte", type="string", example="CMPT-001"),
+ *     @OA\Property(property="numero_compte", type="string", example="RA14112583"),
  *     @OA\Property(property="titulaire", type="string", example="John Doe"),
  *     @OA\Property(property="code_marchand", type="string", nullable=true, example="MRC001"),
  *     @OA\Property(property="statut", type="string", enum={"actif","inactif","suspendu"}, example="actif"),
@@ -492,7 +493,7 @@ class CompteController extends Controller
 
             $compte = $this->compteService->create($data);
 
-            return $this->respondCreated($compte, 'Compte secondaire "' . $data['nom_compte'] . '" créé avec succès. Il est inactif par défaut.');
+            return $this->respondCreated(new CompteResource($compte), 'Compte secondaire "' . $data['nom_compte'] . '" créé avec succès. Il est inactif par défaut.');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -504,12 +505,12 @@ class CompteController extends Controller
      *     tags={"Comptes"},
      *     summary="Afficher un compte spécifique",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
+     * @OA\Parameter(
      *         name="compte",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="string"),
-     *         description="ID du compte"
+     *         description="Numéro du compte"
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -527,7 +528,7 @@ class CompteController extends Controller
                 return $this->errorResponse('Accès non autorisé à ce compte', 403);
             }
 
-            return $this->successResponse($compte, 'Compte récupéré avec succès');
+            return $this->successResponse(new CompteResource($compte), 'Compte récupéré avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -539,18 +540,18 @@ class CompteController extends Controller
      *     tags={"Comptes"},
      *     summary="Mettre à jour un compte",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
+     * @OA\Parameter(
      *         name="compte",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="string"),
-     *         description="ID du compte"
+     *         description="Numéro du compte"
      *     ),
-     *     @OA\RequestBody(
+     * @OA\RequestBody(
      *         @OA\JsonContent(
      *             @OA\Property(property="titulaire", type="string", example="Jane Doe"),
      *             @OA\Property(property="code_marchand", type="string", example="MRC002"),
-     *             @OA\Property(property="statut", type="string", enum={"actif","inactif","suspendu"}, example="actif")
+     *             @OA\Property(property="statut", type="string", enum={"actif","inactif","suspendu"}, example="inactif")
      *         )
      *     ),
      *     @OA\Response(
@@ -607,7 +608,7 @@ class CompteController extends Controller
                 ? 'Compte mis à jour avec succès. Tous les autres comptes ont été désactivés.'
                 : 'Compte mis à jour avec succès';
 
-            return $this->successResponse($compte, $message);
+            return $this->successResponse(new CompteResource($compte), $message);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -619,12 +620,12 @@ class CompteController extends Controller
       *     tags={"Comptes"},
       *     summary="Demander la suppression d'un compte (génère un code de confirmation)",
       *     security={{"bearerAuth":{}}},
-      *     @OA\Parameter(
+      * @OA\Parameter(
       *         name="compte",
       *         in="path",
       *         required=true,
       *         @OA\Schema(type="string"),
-      *         description="ID du compte"
+      *         description="Numéro du compte"
       *     ),
       *     @OA\Response(
       *         response=200,
@@ -773,12 +774,12 @@ class CompteController extends Controller
      *     tags={"Comptes"},
      *     summary="Restaurer un compte supprimé",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
+     * @OA\Parameter(
      *         name="compte",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="string"),
-     *         description="ID du compte"
+     *         description="Numéro du compte"
      *     ),
      *     @OA\Response(
      *         response=200,
@@ -801,7 +802,7 @@ class CompteController extends Controller
                 return $this->errorResponse('Erreur lors de la restauration du compte');
             }
 
-            return $this->successResponse($compte, 'Compte restauré avec succès');
+            return $this->successResponse(new CompteResource($compte), 'Compte restauré avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -813,12 +814,12 @@ class CompteController extends Controller
      *     tags={"Comptes"},
      *     summary="Supprimer définitivement un compte",
      *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
+     * @OA\Parameter(
      *         name="compte",
      *         in="path",
      *         required=true,
      *         @OA\Schema(type="string"),
-     *         description="ID du compte"
+     *         description="Numéro du compte"
      *     ),
      *     @OA\Response(
      *         response=200,

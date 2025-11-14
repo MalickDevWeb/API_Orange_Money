@@ -7,6 +7,9 @@ use App\Models\Compte;
 use App\Models\User;
 use App\Services\TransactionService;
 use App\Interfaces\Notifications\BrevoServiceInterface;
+use App\Http\Resources\TransferResponseResource;
+use App\Http\Resources\TransactionResource;
+use App\Http\Requests\UnifiedTransactionRequest;
 use App\Traits\ApiResponseTrait;
 use App\Traits\PaginatedSortedTrait;
 use Illuminate\Http\Request;
@@ -22,18 +25,13 @@ use Illuminate\Support\Facades\View;
   * @OA\Schema(
   *     schema="Transaction",
   *     type="object",
-  *     @OA\Property(property="id", type="string", format="uuid", example="uuid-transaction"),
   *     @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
-  *     @OA\Property(property="montant", type="number", format="float", example=50000, description="Montant de base de la transaction"),
-  *     @OA\Property(property="frais", type="number", format="float", example=7.5, description="Frais totaux appliqués (frais système + taxes utilisateur)"),
+  *     @OA\Property(property="montant", type="string", example="-50000.00", description="Montant de la transaction avec signe (+ pour crédits, - pour débits)"),
+  *     @OA\Property(property="frais", type="number", format="float", example=7.5, description="Montant total des frais calculés et appliqués à la transaction (en FCFA, pas un pourcentage)"),
   *     @OA\Property(property="reference", type="string", example="TXN-123456"),
   *     @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie"),
   *     @OA\Property(property="note", type="string", nullable=true, example="Paiement de facture"),
-  *     @OA\Property(property="compte_emetteur_id", type="string", format="uuid", nullable=true),
-  *     @OA\Property(property="compte_recepteur_id", type="string", format="uuid", nullable=true),
-  *     @OA\Property(property="date_transaction", type="string", format="date-time"),
-  *     @OA\Property(property="created_at", type="string", format="date-time"),
-  *     @OA\Property(property="updated_at", type="string", format="date-time")
+  *     @OA\Property(property="date_transaction", type="string", format="date-time")
   * )
   *
   * @OA\Schema(
@@ -184,11 +182,12 @@ class TransactionController extends Controller
      *                     @OA\Items(
      *                         type="object",
      *                         @OA\Property(property="type", type="string", enum={"depot","retrait","transfert","paiement","achat_virtuel"}, example="transfert"),
-     *                         @OA\Property(property="montant", type="number", format="float", example=50000),
+     *                         @OA\Property(property="montant", type="string", example="-50000.00"),
      *                         @OA\Property(property="frais", type="number", format="float", example=7.5),
      *                         @OA\Property(property="reference", type="string", example="TXN-123456"),
      *                         @OA\Property(property="statut", type="string", enum={"reussie","echouee","annulee"}, example="reussie"),
      *                         @OA\Property(property="note", type="string", example="Paiement de facture"),
+     *                         @OA\Property(property="date_transaction", type="string", format="date-time"),
      *                         @OA\Property(property="numero_envoyer", type="string", nullable=true, example="771234567"),
      *                         @OA\Property(property="numero_recepteur", type="string", nullable=true, example="771234568")
      *                     )
@@ -225,11 +224,12 @@ class TransactionController extends Controller
             $formattedData = $transactions->getCollection()->map(function ($transaction) {
                 return [
                     'type' => $transaction->type,
-                    'montant' => $transaction->montant,
+                    'montant' => $transaction->montant_signe,
                     'frais' => $transaction->frais ?? 0,
                     'reference' => $transaction->reference,
                     'statut' => $transaction->statut,
                     'note' => $transaction->note,
+                    'date_transaction' => $transaction->date_transaction,
                     'numero_envoyer' => $transaction->compte_emetteur_id ? $transaction->compteEmetteur->utilisateur->telephone : null,
                     'numero_recepteur' => $transaction->compte_recepteur_id ? $transaction->compteRecepteur->utilisateur->telephone : null,
                 ];
@@ -525,7 +525,7 @@ class TransactionController extends Controller
             $data['date_transaction'] = now();
 
             $transaction = $this->transactionService->create($data);
-            return $this->respondCreated($transaction, 'Transaction créée avec succès');
+            return $this->respondCreated(new TransactionResource($transaction), 'Transaction créée avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -555,7 +555,7 @@ class TransactionController extends Controller
     public function show(Transaction $transaction)
     {
         try {
-            return $this->successResponse($transaction, 'Transaction récupérée avec succès');
+            return $this->successResponse(new TransactionResource($transaction), 'Transaction récupérée avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -606,9 +606,10 @@ class TransactionController extends Controller
             $transaction = $this->transactionService->create($data);
 
             // Envoyer un email de confirmation au destinataire
+            return $this->respondCreated(new TransactionResource($transaction), 'Dépôt effectué avec succès');
             if ($userRecepteur->email) {
                 $subject = "Dépôt reçu - {$transaction->reference}";
-                $message = "Vous avez reçu un dépôt de {$transaction->montant} FCFA.";
+                $message = "Vous avez reçu un dépôt de {$transaction->montant_signe} FCFA.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => $transaction,
                     'message' => $message,
@@ -722,7 +723,7 @@ class TransactionController extends Controller
                 // Envoyer l'OTP par email au client
                 if ($userEmetteur->email) {
                     $subject = "Code de confirmation de retrait - {$transaction->reference}";
-                    $message = "Voici votre code de retrait : {$otpCode}. Montant : {$data['montant']} FCFA. Ce code expire dans 10 minutes.";
+                    $message = "Voici votre code de retrait : {$otpCode}. Montant : {$transaction->montant_signe} FCFA. Ce code expire dans 10 minutes.";
                     $htmlContent = View::make('emails.transaction-notification', [
                         'transaction' => $transaction,
                         'message' => $message,
@@ -734,7 +735,7 @@ class TransactionController extends Controller
                 // Envoyer un email au fournisseur
                 if ($authenticatedUser->email) {
                     $subject = "Retrait initié - {$transaction->reference}";
-                    $message = "Vous avez initié un retrait de {$data['montant']} FCFA pour le client {$userEmetteur->nom} {$userEmetteur->prenom}. En attente de confirmation du client.";
+                    $message = "Vous avez initié un retrait de {$transaction->montant_signe} FCFA pour le client {$userEmetteur->nom} {$userEmetteur->prenom}. En attente de confirmation du client.";
                     $htmlContent = View::make('emails.transaction-notification', [
                         'transaction' => $transaction,
                         'message' => $message,
@@ -751,7 +752,7 @@ class TransactionController extends Controller
                 // Retrait direct (client ou fournisseur pour lui-même)
                 $transactionData['statut'] = 'reussie';
                 $transaction = $this->transactionService->create($transactionData);
-                return $this->respondCreated($transaction, 'Retrait effectué avec succès');
+                return $this->respondCreated(new TransactionResource($transaction), 'Retrait effectué avec succès');
             }
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -820,7 +821,7 @@ class TransactionController extends Controller
             // Envoyer les emails de confirmation
             $this->sendRetraitConfirmationEmails($transaction, $authenticatedUser);
 
-            return $this->successResponse($transaction, 'Retrait confirmé avec succès');
+            return $this->successResponse(new TransactionResource($transaction), 'Retrait confirmé avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -874,7 +875,7 @@ class TransactionController extends Controller
             if ($receiver->email) {
                 $newBalance = $receiver->comptes->first()->solde ?? 0;
                 $subject = "Transaction reçue - {$transaction->reference}";
-                $message = "Vous avez reçu une transaction de {$transaction->montant} FCFA de {$sender->nom} {$sender->prenom}. Nouveau solde : {$newBalance} FCFA.";
+                $message = "Vous avez reçu une transaction de {$transaction->montant_signe} FCFA de {$sender->nom} {$sender->prenom}. Nouveau solde : {$newBalance} FCFA.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => $transaction,
                     'message' => $message,
@@ -887,7 +888,7 @@ class TransactionController extends Controller
             if ($sender->email) {
                 $currentBalance = $sender->comptes->first()->solde ?? 0;
                 $subject = "Transaction effectuée - {$transaction->reference}";
-                $message = "Votre transaction de {$transaction->montant} FCFA vers {$receiver->nom} {$receiver->prenom} a été effectuée avec succès. Solde actuel : {$currentBalance} FCFA.";
+                $message = "Votre transaction de {$transaction->montant_signe} FCFA vers {$receiver->nom} {$receiver->prenom} a été effectuée avec succès. Solde actuel : {$currentBalance} FCFA.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => $transaction,
                     'message' => $message,
@@ -915,7 +916,7 @@ class TransactionController extends Controller
                 if ($client->email) {
                     $soldeActuel = $transaction->compteEmetteur->solde;
                     $subject = "Confirmation de retrait - {$transaction->reference}";
-                    $message = "Votre retrait de {$transaction->montant} FCFA a été confirmé avec succès. Solde actuel : {$soldeActuel} FCFA.";
+                    $message = "Votre retrait de {$transaction->montant_signe} FCFA a été confirmé avec succès. Solde actuel : {$soldeActuel} FCFA.";
                     $htmlContent = View::make('emails.transaction-notification', [
                         'transaction' => $transaction,
                         'message' => $message,
@@ -928,7 +929,7 @@ class TransactionController extends Controller
             // Email au fournisseur
             if ($fournisseur->email) {
                 $subject = "Confirmation de retrait effectué - {$transaction->reference}";
-                $message = "Le retrait de {$transaction->montant} FCFA pour le client {$transaction->compteEmetteur->utilisateur->nom} {$transaction->compteEmetteur->utilisateur->prenom} a été confirmé avec succès.";
+                $message = "Le retrait de {$transaction->montant_signe} FCFA pour le client {$transaction->compteEmetteur->utilisateur->nom} {$transaction->compteEmetteur->utilisateur->prenom} a été confirmé avec succès.";
                 $htmlContent = View::make('emails.transaction-notification', [
                     'transaction' => $transaction,
                     'message' => $message,
@@ -1081,7 +1082,7 @@ class TransactionController extends Controller
                 default => 'Transaction effectuée avec succès'
             };
 
-            return $this->respondCreated($transaction, $message);
+            return $this->respondCreated(new TransactionResource($transaction), $message);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -1161,7 +1162,7 @@ class TransactionController extends Controller
             $data['frais'] = $frais; // Ajouter les frais dans les données
 
             $transaction = $this->transactionService->create($data);
-            return $this->respondCreated($transaction, 'Paiement effectué avec succès');
+            return $this->respondCreated(new TransactionResource($transaction), 'Paiement effectué avec succès');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -1223,7 +1224,7 @@ class TransactionController extends Controller
             ];
 
             $transaction = $this->transactionService->create($transactionData);
-            return $this->successResponse($transaction, 'Achat virtuel effectué avec succès', 201);
+            return $this->successResponse(new TransactionResource($transaction), 'Achat virtuel effectué avec succès', 201);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -1254,17 +1255,13 @@ class TransactionController extends Controller
       *     @OA\Response(response=404, description="Utilisateur non trouvé")
       * )
       */
-    public function unifiedTransaction(Request $request)
+    public function unifiedTransaction(UnifiedTransactionRequest $request)
     {
         try {
             /** @var \App\Models\User $authenticatedUser */
             $authenticatedUser = auth()->user();
 
-            // Validation de base
-            $data = $request->validate([
-                'montant' => 'required|numeric|min:0.01',
-                'telephone_recepteur' => 'required|string|exists:users,telephone',
-            ]);
+            $data = $request->validated();
 
 
             // L'émetteur est toujours l'utilisateur connecté
@@ -1395,14 +1392,32 @@ class TransactionController extends Controller
             // Envoyer des emails de confirmation aux deux parties
             $this->sendTransactionSuccessEmails($userEmetteur, $userRecepteur, $transaction, $typeTransaction);
 
-            $message = match($typeTransaction) {
-                'depot' => 'Dépôt effectué avec succès',
-                'transfert' => 'Transfert effectué avec succès',
-                'paiement' => 'Paiement effectué avec succès',
-                default => 'Transaction effectuée avec succès'
-            };
+            // Préparer la réponse selon le type de transaction
+            if ($typeTransaction === 'transfert') {
+                // Pour les transferts, retourner les détails avec +/- et solde
+                $currentBalance = $compteEmetteur->fresh()->solde; // Recharger le solde après transaction
 
-            return $this->respondCreated($transaction, $message);
+                $transferData = [
+                    'montant_transferer' => $transaction->montant_signe,
+                    'solde_actuelle' => number_format($currentBalance, 0, ',', ' '),
+                    'type' => 'transfert',
+                    'numero_transfer' => $transaction->reference,
+                    'numero_destinataire' => $data['telephone_recepteur']
+                ];
+
+                return $this->successResponse([
+                    'user' => new TransferResponseResource($transferData),
+                    'message' => 'Transfert effectué avec succès'
+                ], 'Transfert effectué avec succès', 201);
+            } else {
+                $message = match($typeTransaction) {
+                    'depot' => 'Dépôt effectué avec succès',
+                    'paiement' => 'Paiement effectué avec succès',
+                    default => 'Transaction effectuée avec succès'
+                };
+
+                return $this->respondCreated(new TransactionResource($transaction), $message);
+            }
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }

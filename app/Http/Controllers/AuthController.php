@@ -6,10 +6,12 @@ use App\Http\Requests\RegisterRequest;
 use App\Http\Requests\LoginRequest;
 use App\Http\Requests\VerifyOtpRequest;
 use App\Interfaces\Auth\AuthInterfaceService;
+use App\Http\Resources\UserResource;
 use App\Traits\ApiResponseTrait;
 use App\Enums\ResponseMessage;
 use App\Events\OtpRequested;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\View;
 
 /**
  * @OA\Tag(
@@ -20,16 +22,13 @@ use Illuminate\Support\Facades\DB;
  * @OA\Schema(
  *     schema="User",
  *     type="object",
- *     @OA\Property(property="id", type="string", format="uuid", example="uuid-user"),
  *     @OA\Property(property="nom", type="string", example="Dupont"),
  *     @OA\Property(property="prenom", type="string", example="Jean"),
  *     @OA\Property(property="telephone", type="string", example="705334611"),
  *     @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
- *     @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client"),
- *     @OA\Property(property="statut", type="string", enum={"actif","inactif","en_attente"}, example="actif"),
- *     @OA\Property(property="pin", type="string", example="1234", description="Code PIN à 4 chiffres"),
- *     @OA\Property(property="created_at", type="string", format="date-time"),
- *     @OA\Property(property="updated_at", type="string", format="date-time")
+ *     @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client", description="Type d'utilisateur : admin (administrateur), client (utilisateur standard, actif immédiatement), commercant/fournisseur (comptes professionnels, en attente d'approbation)"),
+ *     @OA\Property(property="statut", type="string", enum={"actif","inactif","en_attente","suspendu"}, example="actif", description="Statut du compte : actif (compte opérationnel), inactif (compte désactivé), en_attente (en attente d'approbation pour commercants/fournisseurs), suspendu (compte temporairement suspendu)"),
+ *     @OA\Property(property="pin", type="string", example="1234", description="Code PIN à 4 chiffres")
  * )
  *
  * @OA\PathItem(
@@ -57,7 +56,8 @@ class AuthController extends Controller
      *     path="/register",
      *     operationId="registerUser",
      *     tags={"Authentification"},
-     *     summary="Inscription d'un nouvel utilisateur",
+     *     summary="Inscription d'un nouvel utilisateur avec envoi d'email automatique",
+     *     description="Crée un nouveau compte utilisateur et envoie automatiquement un email de confirmation. Pour les commerçants et fournisseurs, le compte sera en attente d'approbation par un administrateur.",
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
@@ -67,15 +67,24 @@ class AuthController extends Controller
      *             @OA\Property(property="telephone", type="string", example="705334611"),
      *             @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
      *             @OA\Property(property="password", type="string", format="password", example="password123"),
-     *             @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client")
+     *             @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client", description="Type d'utilisateur : client (actif immédiatement), commerçant/fournisseur (en attente d'approbation)")
      *         )
      *     ),
      *     @OA\Response(
      *         response=201,
      *         description="Utilisateur créé avec succès",
      *         @OA\JsonContent(
-     *             @OA\Property(property="user", ref="#/components/schemas/User"),
-     *             @OA\Property(property="message", type="string", example="Utilisateur enregistré avec succès")
+     *             @OA\Property(property="user",
+     *                 @OA\Property(property="nom", type="string", example="Dupont"),
+     *                 @OA\Property(property="prenom", type="string", example="Jean"),
+     *                 @OA\Property(property="telephone", type="string", example="705334611"),
+     *                 @OA\Property(property="email", type="string", format="email", example="jean.dupont@example.com"),
+     *                 @OA\Property(property="type", type="string", enum={"admin","client","commercant","fournisseur"}, example="client"),
+     *                 @OA\Property(property="statut", type="string", enum={"actif","inactif","en_attente"}, example="actif"),
+     *                 @OA\Property(property="pin", type="string", example="1234")
+     *             ),
+     *             @OA\Property(property="message", type="string", example="Utilisateur enregistré avec succès"),
+     *             @OA\Property(property="redirect_url", type="string", example="http://localhost:8000/api/login?telephone=705334611")
      *         )
      *     ),
      *     @OA\Response(response=422, description="Données invalides")
@@ -87,7 +96,38 @@ class AuthController extends Controller
         try {
             $user = $this->authService->register($request->validated());
             $redirectUrl = url('/api/login?telephone=' . urlencode($user->telephone));
-            return $this->respondCreated($user, ResponseMessage::USER_REGISTERED->value, $redirectUrl);
+
+            // Envoyer un email de notification à l'admin
+            $admin = \App\Models\User::where('type', 'admin')->first();
+            if ($admin && $admin->email) {
+                $subject = "Nouvelle inscription - {$user->nom} {$user->prenom}";
+                $message = "Un nouvel utilisateur s'est inscrit : {$user->nom} {$user->prenom} ({$user->telephone}, {$user->email}). Type : {$user->type}. Statut : {$user->statut}.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'admin_notification'
+                ])->render();
+
+                try {
+                    \Illuminate\Support\Facades\Mail::html($htmlContent, function ($mail) use ($admin, $subject) {
+                        $mail->to($admin->email)
+                             ->subject($subject);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email de notification d\'inscription envoyé à l\'admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'new_user_id' => $user->id
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email notification admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            return $this->respondCreated(new UserResource($user), ResponseMessage::USER_REGISTERED->value, $redirectUrl);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
@@ -95,8 +135,8 @@ class AuthController extends Controller
 
     /**
      * @OA\Post(
-     *     path="/login",
-     *     operationId="loginUser",
+     *     path="/sendOTP",
+     *     operationId="sendOtp",
      *     tags={"Authentification"},
      *     summary="Connexion : Vérification téléphone et envoi OTP",
      * @OA\RequestBody(
@@ -180,7 +220,7 @@ class AuthController extends Controller
     /**
      * @OA\Post(
      *     path="/logout",
-     *     operationId="logoutUser",
+     *     operationId="verifyOtp",
      *     tags={"Authentification"},
      *     summary="Vérifier l'OTP et déconnecter l'utilisateur",
      *     security={{"bearerAuth":{}}},
@@ -220,10 +260,10 @@ class AuthController extends Controller
     /**
      * @OA\Post(
      *     path="/login/otp",
-     *     operationId="verifyOtp",
+     *     operationId="login",
      *     tags={"Authentification"},
-     *     summary="Deuxième étape : Vérification du code OTP",
-     *     @OA\RequestBody(
+     *     summary="Login",
+     * @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
      *             required={"telephone","otp_code"},
@@ -259,7 +299,7 @@ class AuthController extends Controller
             return $this->respondWithToken(
                 $result['token'],
                 $message,
-                $result['user'],
+                new UserResource($result['user']),
                 $extra
             );
         } catch (\Exception $e) {
@@ -291,13 +331,7 @@ class AuthController extends Controller
     {
         try {
             $user = $this->authService->user();
-            $userData = [
-                'nom' => $user->nom,
-                'prenom' => $user->prenom,
-                'telephone' => $user->telephone,
-                'email' => $user->email,
-            ];
-            return $this->successResponse($userData, ResponseMessage::USER_RETRIEVED->value);
+            return $this->successResponse(new UserResource($user), ResponseMessage::USER_RETRIEVED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }

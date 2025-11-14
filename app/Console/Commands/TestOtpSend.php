@@ -62,7 +62,7 @@ class TestOtpSend extends Command
             }
 
             // Create OTP code
-            $otp = OtpCode::createForUser($user->id, $user->telephone, 'test');
+            $otp = OtpCode::createForUser($user->id, $user->telephone, 'login');
             $this->info("🔢 OTP Code created: {$otp->code}");
             $this->info("🆔 OTP ID: {$otp->id}");
 
@@ -144,3 +144,4 @@ class TestOtpSend extends Command
         return 0;
     }
 }
+

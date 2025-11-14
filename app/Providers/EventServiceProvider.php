@@ -34,6 +34,9 @@ class EventServiceProvider extends ServiceProvider
         \App\Events\NotificationTestRequested::class => [
             \App\Listeners\HandleNotificationTest::class,
         ],
+        \App\Events\UserRegistered::class => [
+            \App\Listeners\SendRegistrationEmailListener::class,
+        ],
     ];
 
     /**

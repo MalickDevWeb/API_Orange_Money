@@ -82,6 +82,16 @@ class TwilioService implements TwilioServiceInterface
     }
 
     /**
+     * Envoyer une notification de transaction avec modèle Transaction
+     */
+    public function sendTransactionNotificationWithModel(string $phoneNumber, \App\Models\Transaction $transaction): bool
+    {
+        $message = $this->buildTransactionMessageWithModel($transaction);
+
+        return $this->sendSms($phoneNumber, $message);
+    }
+
+    /**
      * Construire le message de notification de transaction
      */
     private function buildTransactionMessage(array $data): string
@@ -89,6 +99,25 @@ class TwilioService implements TwilioServiceInterface
         $type = $data['type'] ?? 'transaction';
         $montant = number_format($data['montant'] ?? 0, 0, ',', ' ');
         $reference = $data['reference'] ?? '';
+
+        $messages = [
+            'depot' => "Dépôt de {$montant} FCFA effectué avec succès. Référence: {$reference}",
+            'retrait' => "Retrait de {$montant} FCFA effectué avec succès. Référence: {$reference}",
+            'transfert' => "Transfert de {$montant} FCFA effectué avec succès. Référence: {$reference}",
+            'paiement' => "Paiement de {$montant} FCFA effectué avec succès. Référence: {$reference}",
+        ];
+
+        return $messages[$type] ?? "Transaction de {$montant} FCFA effectuée. Référence: {$reference}";
+    }
+
+    /**
+     * Construire le message de notification de transaction avec modèle Transaction
+     */
+    private function buildTransactionMessageWithModel(\App\Models\Transaction $transaction): string
+    {
+        $type = $transaction->type;
+        $montant = $transaction->montant_signe;
+        $reference = $transaction->reference;
 
         $messages = [
             'depot' => "Dépôt de {$montant} FCFA effectué avec succès. Référence: {$reference}",

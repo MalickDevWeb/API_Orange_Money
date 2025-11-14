@@ -25,6 +25,11 @@ interface BrevoServiceInterface
     public function sendTransactionNotification(string $email, array $transactionData): array;
 
     /**
+     * Envoyer un email de notification de transaction avec modèle Transaction
+     */
+    public function sendTransactionNotificationWithModel(string $email, \App\Models\Transaction $transaction): array;
+
+    /**
      * Envoyer un email OTP
      */
     public function sendOtpEmail(string $email, string $otp): array;

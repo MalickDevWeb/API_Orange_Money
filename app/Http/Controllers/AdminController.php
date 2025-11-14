@@ -16,6 +16,9 @@ use App\Enums\{UserStatus, BalanceRequestStatus, TransactionType, TransactionSta
 use App\Enums\T;
 use App\Services\AdminService;
 use App\Interfaces\Services\CompteServiceInterface;
+use App\Interfaces\Notifications\BrevoServiceInterface;
+use Illuminate\Support\Facades\View;
+use Illuminate\Support\Facades\Mail;
 use App\Http\Requests\UpdateUserRightsRequest;
 use App\Http\Requests\UpdateGlobalFeesRequest;
 use App\Http\Requests\SetUserTaxRequest;
@@ -56,11 +59,13 @@ class AdminController extends Controller
 
     protected AdminService $adminService;
     protected CompteServiceInterface $compteService;
+    protected BrevoServiceInterface $brevoService;
 
-    public function __construct(AdminService $adminService, CompteServiceInterface $compteService)
+    public function __construct(AdminService $adminService, CompteServiceInterface $compteService, BrevoServiceInterface $brevoService)
     {
         $this->adminService = $adminService;
         $this->compteService = $compteService;
+        $this->brevoService = $brevoService;
         $this->middleware(T::passport->value);
         $this->middleware(function ($request, $next) {
             if (Auth::user()->type !== UserType::ADMIN->value) {
@@ -102,32 +107,6 @@ class AdminController extends Controller
         }, ResponseMessage::PENDING_USERS_RETRIEVED->value);
     }
 
-    /**
-     * @OA\Post(
-     *     path="/admin/users/{telephone}/approve",
-     *     operationId="approveUser",
-     *     tags={"Administration"},
-     *     summary="Approuver un utilisateur par numéro de téléphone",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="telephone",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string", example="770000040"),
-     *         description="Numéro de téléphone de l'utilisateur à approuver"
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Utilisateur approuvé",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Utilisateur approuvé avec succès")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Non autorisé"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
     public function approveUser($telephone)
     {
         try {
@@ -144,44 +123,96 @@ class AdminController extends Controller
 
             $user->update(['statut' => UserStatus::ACTIF->value]);
 
+            // Envoyer un email de confirmation à l'utilisateur
+            if ($user->email) {
+                $subject = "Inscription approuvée - {$user->nom} {$user->prenom}";
+                $message = "Félicitations ! Votre inscription en tant que {$user->type} a été approuvée par l'administrateur. Vous pouvez maintenant accéder à toutes les fonctionnalités de l'application.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'user_approval'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContent, function ($mail) use ($user, $subject) {
+                        $mail->to($user->email)
+                             ->subject($subject);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email d\'approbation envoyé via Laravel Mail', [
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email approbation', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // Envoyer un email de notification à l'admin
+            $admin = Auth::user();
+            if ($admin && $admin->email) {
+                $subjectAdmin = "Approbation d'utilisateur - {$user->nom} {$user->prenom}";
+                $messageAdmin = "Vous avez approuvé l'inscription de {$user->nom} {$user->prenom} ({$user->telephone}). L'utilisateur a été notifié par email.";
+                $htmlContentAdmin = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $messageAdmin,
+                    'role' => 'admin_confirmation'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContentAdmin, function ($mail) use ($admin, $subjectAdmin) {
+                        $mail->to($admin->email)
+                             ->subject($subjectAdmin);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email de confirmation d\'approbation envoyé à l\'admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'approved_user_id' => $user->id
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email confirmation admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            if ($user->email) {
+                $subject = "Inscription approuvée - {$user->nom} {$user->prenom}";
+                $message = "Félicitations ! Votre inscription en tant que {$user->type} a été approuvée par l'administrateur. Vous pouvez maintenant accéder à toutes les fonctionnalités de l'application.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'user_approval'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContent, function ($mail) use ($user, $subject) {
+                        $mail->to($user->email)
+                             ->subject($subject);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email d\'approbation envoyé via Laravel Mail', [
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email approbation', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
             return $this->successResponse(null, ResponseMessage::USER_APPROVED->value);
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/admin/users/{telephone}/reject",
-     *     operationId="rejectUser",
-     *     tags={"Administration"},
-     *     summary="Rejeter un utilisateur par numéro de téléphone",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="telephone",
-     *         in="path",
-     *         required=true,
-     *         @OA\Schema(type="string", example="770000040"),
-     *         description="Numéro de téléphone de l'utilisateur à rejeter"
-     *     ),
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             @OA\Property(property="motif_rejet", type="string", example="Documents insuffisants")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Utilisateur rejeté",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Utilisateur rejeté")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Non autorisé"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
     public function rejectUser(Request $request, $telephone)
     {
         try {
@@ -198,7 +229,92 @@ class AdminController extends Controller
 
             $user->update(['statut' => UserStatus::INACTIF->value]);
 
-            // TODO: Peut-être stocker le motif de rejet quelque part
+            // Envoyer un email de rejet à l'utilisateur
+            if ($user->email) {
+                $subject = "Inscription rejetée - {$user->nom} {$user->prenom}";
+                $motif = $request->motif_rejet ?? 'Aucun motif spécifié';
+                $message = "Nous regrettons de vous informer que votre inscription en tant que {$user->type} a été rejetée par l'administrateur. Motif : {$motif}. Vous pouvez contacter le support pour plus d'informations.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'user_rejection'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContent, function ($mail) use ($user, $subject) {
+                        $mail->to($user->email)
+                             ->subject($subject);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email de rejet envoyé via Laravel Mail', [
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email rejet', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+
+            // Envoyer un email de notification à l'admin
+            $admin = Auth::user();
+            if ($admin && $admin->email) {
+                $subjectAdmin = "Rejet d'utilisateur - {$user->nom} {$user->prenom}";
+                $motifAdmin = $request->motif_rejet ?? 'Aucun motif spécifié';
+                $messageAdmin = "Vous avez rejeté l'inscription de {$user->nom} {$user->prenom} ({$user->telephone}). Motif : {$motifAdmin}. L'utilisateur a été notifié par email.";
+                $htmlContentAdmin = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $messageAdmin,
+                    'role' => 'admin_confirmation'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContentAdmin, function ($mail) use ($admin, $subjectAdmin) {
+                        $mail->to($admin->email)
+                             ->subject($subjectAdmin);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email de confirmation de rejet envoyé à l\'admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'rejected_user_id' => $user->id
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email confirmation admin', [
+                        'admin_id' => $admin->id,
+                        'admin_email' => $admin->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
+            if ($user->email) {
+                $subject = "Inscription rejetée - {$user->nom} {$user->prenom}";
+                $motif = $request->motif_rejet ?? 'Aucun motif spécifié';
+                $message = "Nous regrettons de vous informer que votre inscription en tant que {$user->type} a été rejetée par l'administrateur. Motif : {$motif}. Vous pouvez contacter le support pour plus d'informations.";
+                $htmlContent = View::make('emails.transaction-notification', [
+                    'transaction' => null,
+                    'message' => $message,
+                    'role' => 'user_rejection'
+                ])->render();
+
+                try {
+                    Mail::html($htmlContent, function ($mail) use ($user, $subject) {
+                        $mail->to($user->email)
+                             ->subject($subject);
+                    });
+                    \Illuminate\Support\Facades\Log::info('Email de rejet envoyé via Laravel Mail', [
+                        'user_id' => $user->id,
+                        'email' => $user->email
+                    ]);
+                } catch (\Exception $e) {
+                    \Illuminate\Support\Facades\Log::error('Erreur envoi email rejet', [
+                        'user_id' => $user->id,
+                        'email' => $user->email,
+                        'error' => $e->getMessage()
+                    ]);
+                }
+            }
 
             return $this->successResponse(null, ResponseMessage::USER_REJECTED->value);
         } catch (\Exception $e) {
@@ -233,199 +349,546 @@ class AdminController extends Controller
     {
         return $this->tryCatch(function () {
             return BalanceRequest::with('supplier')
-                               ->where('statut', BalanceRequestStatus::EN_ATTENTE->value)
-                               ->get();
+                                ->where('statut', BalanceRequestStatus::EN_ATTENTE->value)
+                                ->get();
         }, ResponseMessage::PENDING_BALANCE_REQUESTS_RETRIEVED->value);
     }
 
     /**
+     * @OA\Get(
+     *     path="/admin/actions",
+     *     operationId="getAdminActions",
+     *     tags={"Administration"},
+     *     summary="Récupérer l'historique des actions administrateur",
+     *     description="Liste paginée des actions admin avec filtrage par type, admin, utilisateur cible et dates",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="action_type",
+     *         in="query",
+     *         description="Filtrer par type d'action",
+     *         required=false,
+     *         @OA\Schema(type="string", example="approve_user")
+     *     ),
+     *     @OA\Parameter(
+     *         name="admin_id",
+     *         in="query",
+     *         description="Filtrer par ID d'admin",
+     *         required=false,
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *     @OA\Parameter(
+     *         name="target_user_id",
+     *         in="query",
+     *         description="Filtrer par ID d'utilisateur cible",
+     *         required=false,
+     *         @OA\Schema(type="string", format="uuid")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_from",
+     *         in="query",
+     *         description="Date de début (YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="date_to",
+     *         in="query",
+     *         description="Date de fin (YYYY-MM-DD)",
+     *         required=false,
+     *         @OA\Schema(type="string", format="date")
+     *     ),
+     *     @OA\Parameter(
+     *         name="per_page",
+     *         in="query",
+     *         description="Nombre d'éléments par page (1-100)",
+     *         required=false,
+     *         @OA\Schema(type="integer", minimum=1, maximum=100, default=15)
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Historique des actions récupéré",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Actions admin récupérées"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="current_page", type="integer"),
+     *                 @OA\Property(property="data", type="array", @OA\Items(
+     *                     type="object",
+     *                     @OA\Property(property="id", type="integer", example=1),
+     *                     @OA\Property(property="admin", type="object",
+     *                         @OA\Property(property="id", type="string", format="uuid"),
+     *                         @OA\Property(property="nom", type="string"),
+     *                         @OA\Property(property="prenom", type="string")
+     *                     ),
+     *                     @OA\Property(property="action_type", type="string", example="approve_user"),
+     *                     @OA\Property(property="target_user", type="object", nullable=true,
+     *                         @OA\Property(property="id", type="string", format="uuid"),
+     *                         @OA\Property(property="nom", type="string"),
+     *                         @OA\Property(property="prenom", type="string"),
+     *                         @OA\Property(property="telephone", type="string")
+     *                     ),
+     *                     @OA\Property(property="details", type="object", example={"action": "approve"}),
+     *                     @OA\Property(property="created_at", type="string", format="date-time")
+     *                 )),
+     *                 @OA\Property(property="per_page", type="integer"),
+     *                 @OA\Property(property="total", type="integer")
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=403, description="Non autorisé")
+     * )
+     */
+    public function getAdminActions(Request $request)
+    {
+        return $this->tryCatch(function () use ($request) {
+            $query = \App\Models\AdminAction::with(['admin', 'targetUser']);
+
+            // Filtre par type d'action
+            if ($request->has('action_type') && !empty($request->action_type)) {
+                $query->where('action_type', $request->action_type);
+            }
+
+            // Filtre par admin
+            if ($request->has('admin_id') && !empty($request->admin_id)) {
+                $query->where('admin_id', $request->admin_id);
+            }
+
+            // Filtre par utilisateur cible
+            if ($request->has('target_user_id') && !empty($request->target_user_id)) {
+                $query->where('target_user_id', $request->target_user_id);
+            }
+
+            // Filtre par date
+            if ($request->has('date_from') && !empty($request->date_from)) {
+                $query->whereDate('created_at', '>=', $request->date_from);
+            }
+
+            if ($request->has('date_to') && !empty($request->date_to)) {
+                $query->whereDate('created_at', '<=', $request->date_to);
+            }
+
+            $actions = $this->getPaginatedSorted($query, $request, 'created_at', 'desc');
+
+            // Formater les données de sortie
+            $formattedData = $actions->getCollection()->map(function ($action) {
+                return [
+                    'id' => $action->id,
+                    'admin' => $action->admin ? [
+                        'id' => $action->admin->id,
+                        'nom' => $action->admin->nom,
+                        'prenom' => $action->admin->prenom,
+                    ] : null,
+                    'action_type' => $action->action_type,
+                    'target_user' => $action->targetUser ? [
+                        'id' => $action->targetUser->id,
+                        'nom' => $action->targetUser->nom,
+                        'prenom' => $action->targetUser->prenom,
+                        'telephone' => $action->targetUser->telephone,
+                    ] : null,
+                    'details' => $action->details,
+                    'created_at' => $action->created_at,
+                ];
+            });
+
+            // Remplacer la collection dans l'objet paginé
+            $actions->setCollection($formattedData);
+
+            return $actions;
+        }, 'Actions admin récupérées');
+    }
+
+
+    /**
+     * @OA\Post(
+     *     path="/admin/users/{telephone}/action",
+     *     operationId="userAction",
+     *     tags={"Administration"},
+     *     summary="Effectuer une action sur un utilisateur (approuver, rejeter, suspendre, bannir, dépôt)",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Parameter(
+     *         name="telephone",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="string", example="770000040"),
+     *         description="Numéro de téléphone de l'utilisateur"
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             required={"action"},
+     *             @OA\Property(property="action", type="string", enum={"approve","reject","suspend","unsuspend","ban","unban","delete","deposit"}, example="approve", description="Action à effectuer"),
+     *             @OA\Property(property="motif_rejet", type="string", example="Documents insuffisants", description="Requis pour reject"),
+     *             @OA\Property(property="montant", type="number", format="float", example=50000, description="Requis pour deposit"),
+     *             @OA\Property(property="note", type="string", example="Dépôt client", description="Optionnel pour deposit")
+     *         )
+     *     ),
+     *     @OA\Response(
+     *         response=200,
+     *         description="Action effectuée avec succès",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Utilisateur approuvé avec succès")
+     *         )
+     *     ),
+     *     @OA\Response(response=400, description="Action invalide ou déjà effectuée"),
+     *     @OA\Response(response=403, description="Non autorisé"),
+     *     @OA\Response(response=404, description="Utilisateur non trouvé")
+     * )
+      */
+     public function userAction(Request $request, $telephone)
+     {
+         try {
+             $telephone = trim($telephone, '"');
+             $user = User::where('telephone', $telephone)->firstOrFail();
+
+             $data = $request->validate([
+                 'action' => 'required|string|in:approve,reject,suspend,unsuspend,ban,unban,delete,deposit',
+                 'motif_rejet' => 'nullable|string',
+                 'montant' => 'nullable|numeric|min:0.01',
+                 'note' => 'nullable|string'
+             ]);
+
+             $action = $data['action'];
+
+             switch ($action) {
+                 case 'approve':
+                     if (!($user->isCommercant() || $user->isFournisseur())) {
+                         return $this->errorResponse(MessagesErreursRequests::APPROVABLE_TYPE_ERROR->value, 400);
+                     }
+                     if ($user->statut === UserStatus::ACTIF->value) {
+                         return $this->errorResponse('Utilisateur déjà approuvé', 400);
+                     }
+                     $user->update(['statut' => UserStatus::ACTIF->value]);
+                     $message = 'Utilisateur approuvé avec succès';
+                     $this->sendUserNotificationEmail($user, 'approval');
+                     break;
+
+                 case 'reject':
+                     if (!($user->isCommercant() || $user->isFournisseur())) {
+                         return $this->errorResponse(MessagesErreursRequests::REJECTABLE_TYPE_ERROR->value, 400);
+                     }
+                     if ($user->statut === UserStatus::INACTIF->value) {
+                         return $this->errorResponse('Utilisateur déjà rejeté', 400);
+                     }
+                     $user->update(['statut' => UserStatus::INACTIF->value]);
+                     $message = 'Utilisateur rejeté';
+                     $this->sendUserNotificationEmail($user, 'rejection', $data['motif_rejet'] ?? null);
+                     break;
+
+                 case 'suspend':
+                     if ($user->statut === UserStatus::SUSPENDU->value) {
+                         return $this->errorResponse('Utilisateur déjà suspendu', 400);
+                     }
+                     $user->update(['statut' => UserStatus::SUSPENDU->value]);
+                     $message = 'Utilisateur suspendu';
+                     break;
+
+                 case 'unsuspend':
+                     if ($user->statut !== UserStatus::SUSPENDU->value) {
+                         return $this->errorResponse('Utilisateur n\'est pas suspendu', 400);
+                     }
+                     $user->update(['statut' => UserStatus::ACTIF->value]);
+                     $message = 'Utilisateur réactivé';
+                     break;
+
+                 case 'ban':
+                     $success = $this->adminService->banUser($user->id);
+                     if (!$success) {
+                         return $this->errorResponse('Utilisateur non trouvé', 404);
+                     }
+                     $message = 'Utilisateur banni';
+                     break;
+
+                 case 'unban':
+                     $success = $this->adminService->unbanUser($user->id);
+                     if (!$success) {
+                         return $this->errorResponse('Utilisateur non trouvé', 404);
+                     }
+                     $message = 'Utilisateur débanni';
+                     break;
+
+                 case 'delete':
+                     $user->delete(); // Soft delete
+                     $message = 'Utilisateur supprimé';
+                     break;
+
+                 case 'deposit':
+                     // Validation du montant
+                     if (empty($data['montant'])) {
+                         return $this->errorResponse('Montant requis pour effectuer un dépôt', 400);
+                     }
+
+                     // Vérifier que c'est un client
+                     if ($user->type !== UserType::CLIENT->value) {
+                         return $this->errorResponse('Seuls les clients peuvent recevoir des dépôts', 400);
+                     }
+
+                     // Trouver le compte du client
+                     $compte = $user->comptes->first();
+                     if (!$compte) {
+                         return $this->errorResponse('Aucun compte trouvé pour ce client', 404);
+                     }
+
+                     // Créer la transaction de dépôt
+                     \App\Models\Transaction::create([
+                         'type' => TransactionType::DEPOT->value,
+                         'montant' => $data['montant'],
+                         'reference' => 'DEP-ADMIN-' . strtoupper(uniqid()),
+                         'statut' => TransactionStatus::REUSSIE->value,
+                         'note' => $data['note'] ?? 'Dépôt effectué par l\'admin',
+                         'compte_emetteur_id' => null,
+                         'compte_recepteur_id' => $compte->id,
+                         'date_transaction' => now(),
+                     ]);
+
+                     $message = 'Dépôt effectué avec succès';
+                     break;
+             }
+
+             // Log admin action
+             $this->adminService->logAdminAction(Auth::id(), $action . '_user', $user->id, $data);
+
+             // Send confirmation email to admin
+             $this->sendAdminConfirmationEmail($action, $user, $data['motif_rejet'] ?? null);
+
+             return $this->successResponse(null, $message);
+         } catch (\Exception $e) {
+             return $this->errorResponse($e->getMessage());
+         }
+     }
+
+     /**
       * @OA\Post(
-      *     path="/admin/balance-requests/{telephone}/approve",
-      *     operationId="approveBalanceRequest",
+      *     path="/admin/balance-requests/{telephone}/action",
+      *     operationId="balanceRequestAction",
       *     tags={"Administration"},
-      *     summary="Approuver une demande de solde",
+      *     summary="Effectuer une action sur une demande de solde (approuver, rejeter)",
       *     security={{"bearerAuth":{}}},
       *     @OA\Parameter(
       *         name="telephone",
       *         in="path",
       *         required=true,
-      *         @OA\Schema(type="string", example="771234567")
+      *         @OA\Schema(type="string", example="771234567"),
+      *         description="Numéro de téléphone du fournisseur"
+      *     ),
+      *     @OA\RequestBody(
+      *         required=true,
+      *         @OA\JsonContent(
+      *             required={"action"},
+      *             @OA\Property(property="action", type="string", enum={"approve","reject"}, example="approve", description="Action à effectuer sur la demande de solde"),
+      *             @OA\Property(property="motif_rejet", type="string", example="Montant trop élevé", description="Requis pour reject")
+      *         )
       *     ),
       *     @OA\Response(
       *         response=200,
-      *         description="Demande approuvée",
+      *         description="Action effectuée avec succès",
       *         @OA\JsonContent(
       *             @OA\Property(property="status", type="string", example="success"),
       *             @OA\Property(property="message", type="string", example="Demande de solde approuvée")
       *         )
       *     ),
+      *     @OA\Response(response=400, description="Action invalide ou motif manquant"),
       *     @OA\Response(response=403, description="Non autorisé"),
-      *     @OA\Response(response=404, description="Demande non trouvée")
+      *     @OA\Response(response=404, description="Demande de solde non trouvée")
       * )
       */
-     public function approveBalanceRequest($telephone)
+     public function balanceRequestAction(Request $request, $telephone)
      {
          try {
              $telephone = trim($telephone, '"');
-             // Trouver la demande de solde en attente pour ce numéro de téléphone
-             $request = BalanceRequest::whereHas('supplier', function($q) use ($telephone) {
-                 $q->where('telephone', $telephone);
-             })->where('statut', BalanceRequestStatus::EN_ATTENTE->value)->firstOrFail();
 
-             $request->update([
-                 'statut' => BalanceRequestStatus::APPROUVEE->value,
-                 'admin_id' => Auth::id(),
-                 'traitee_at' => now()
+             $data = $request->validate([
+                 'action' => 'required|string|in:approve,reject',
+                 'motif_rejet' => 'nullable|string'
              ]);
 
-             // Créer une transaction de dépôt pour ajouter le montant au solde du fournisseur
-             $supplier = $request->supplier;
-             if ($supplier && $supplier->comptes->count() > 0) {
-                 $compte = $supplier->comptes->first();
-                 \App\Models\Transaction::create([
-                     'type' => TransactionType::DEPOT->value,
-                     'montant' => $request->montant,
-                     'reference' => 'DEP-APPROVAL-' . strtoupper(uniqid()),
-                     'statut' => TransactionStatus::REUSSIE->value,
-                     'note' => 'Approbation de demande de solde',
-                     'compte_emetteur_id' => null,
-                     'compte_recepteur_id' => $compte->id,
-                     'date_transaction' => now(),
-                 ]);
-             }
+             $action = $data['action'];
 
-             return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_APPROVED->value);
-         } catch (\Exception $e) {
-             return $this->errorResponse($e->getMessage());
-         }
-     }
-
-    /**
-      * @OA\Post(
-      *     path="/admin/balance-requests/{telephone}/reject",
-      *     operationId="rejectBalanceRequest",
-      *     tags={"Administration"},
-      *     summary="Rejeter une demande de solde",
-      *     security={{"bearerAuth":{}}},
-      *     @OA\Parameter(
-      *         name="telephone",
-      *         in="path",
-      *         required=true,
-      *         @OA\Schema(type="string", example="771234567")
-      *     ),
-      *     @OA\RequestBody(
-      *         required=true,
-      *         @OA\JsonContent(
-      *             @OA\Property(property="motif_rejet", type="string", example="Montant trop élevé")
-      *         )
-      *     ),
-      *     @OA\Response(
-      *         response=200,
-      *         description="Demande rejetée",
-      *         @OA\JsonContent(
-      *             @OA\Property(property="status", type="string", example="success"),
-      *             @OA\Property(property="message", type="string", example="Demande de solde rejetée")
-      *         )
-      *     ),
-      *     @OA\Response(response=403, description="Non autorisé"),
-      *     @OA\Response(response=404, description="Demande non trouvée")
-      * )
-      */
-     public function rejectBalanceRequest(Request $request, $telephone)
-     {
-         try {
-             $request->validate([
-                 MessagesErreursRequests::VALIDATION_MOTIF_REJET->value => MessagesErreursRequests::VALIDATION_MOTIF_REJET_RULES->value
-             ]);
-
-             $telephone = trim($telephone, '"');
              // Trouver la demande de solde en attente pour ce numéro de téléphone
              $balanceRequest = BalanceRequest::whereHas('supplier', function($q) use ($telephone) {
                  $q->where('telephone', $telephone);
-             })->where('statut', BalanceRequestStatus::EN_ATTENTE->value)->firstOrFail();
+             })->where('statut', BalanceRequestStatus::EN_ATTENTE->value)->first();
 
-             $balanceRequest->update([
-                 'statut' => BalanceRequestStatus::REJETEE->value,
-                 'motif_rejet' => $request->motif_rejet,
-                 'admin_id' => Auth::id(),
-                 'traitee_at' => now()
-             ]);
+             if (!$balanceRequest) {
+                 // Vérifier s'il y a une demande déjà traitée
+                 $existingRequest = BalanceRequest::whereHas('supplier', function($q) use ($telephone) {
+                     $q->where('telephone', $telephone);
+                 })->latest()->first();
 
-             return $this->successResponse(null, ResponseMessage::BALANCE_REQUEST_REJECTED->value);
+                 if ($existingRequest) {
+                     if ($existingRequest->statut === BalanceRequestStatus::APPROUVEE->value) {
+                         if ($action === 'approve') {
+                             return $this->errorResponse('Cette demande de solde a déjà été approuvée', 400);
+                         } else {
+                             return $this->errorResponse('Cette demande de solde a déjà été approuvée, vous ne pouvez pas la rejeter', 400);
+                         }
+                     } elseif ($existingRequest->statut === BalanceRequestStatus::REJETEE->value) {
+                         if ($action === 'reject') {
+                             return $this->errorResponse('Cette demande de solde a déjà été rejetée', 400);
+                         } else {
+                             return $this->errorResponse('Cette demande de solde a déjà été rejetée, vous ne pouvez pas l\'approuver', 400);
+                         }
+                     }
+                 }
+
+                 return $this->errorResponse('Aucune demande de solde en attente trouvée pour ce numéro', 404);
+             }
+
+             $supplier = $balanceRequest->supplier;
+
+             switch ($action) {
+                case 'approve':
+                    $balanceRequest->update([
+                        'statut' => BalanceRequestStatus::APPROUVEE->value,
+                        'admin_id' => Auth::id(),
+                        'traitee_at' => now()
+                    ]);
+
+                    // Créer une transaction de dépôt pour ajouter le montant au solde du fournisseur
+                    if ($supplier && $supplier->comptes->count() > 0) {
+                        $compte = $supplier->comptes->first();
+                        \App\Models\Transaction::create([
+                            'type' => TransactionType::DEPOT->value,
+                            'montant' => $balanceRequest->montant,
+                            'reference' => 'DEP-APPROVAL-' . strtoupper(uniqid()),
+                            'statut' => TransactionStatus::REUSSIE->value,
+                            'note' => 'Approbation de demande de solde',
+                            'compte_emetteur_id' => null,
+                            'compte_recepteur_id' => $compte->id,
+                            'date_transaction' => now(),
+                        ]);
+                    }
+
+                    // Envoyer un email de confirmation au fournisseur
+                    $this->sendBalanceRequestNotificationEmail($supplier, 'approved', $balanceRequest->montant);
+
+                    $message = 'Demande de solde approuvée';
+                    break;
+
+                case 'reject':
+                    // Validation du motif de rejet
+                    if (empty($data['motif_rejet'])) {
+                        return $this->errorResponse('Motif de rejet requis pour rejeter une demande de solde', 400);
+                    }
+
+                    $balanceRequest->update([
+                        'statut' => BalanceRequestStatus::REJETEE->value,
+                        'motif_rejet' => $data['motif_rejet'],
+                        'admin_id' => Auth::id(),
+                        'traitee_at' => now()
+                    ]);
+
+                    // Envoyer un email de rejet au fournisseur
+                    $this->sendBalanceRequestNotificationEmail($supplier, 'rejected', null, $data['motif_rejet']);
+
+                    $message = 'Demande de solde rejetée';
+                    break;
+            }
+
+             // Log admin action
+             $this->adminService->logAdminAction(Auth::id(), $action . '_balance_request', $balanceRequest->supplier->id, $data);
+
+             // Send confirmation email to admin
+             $this->sendAdminConfirmationEmail($action . '_balance_request', $balanceRequest->supplier, $data['motif_rejet'] ?? null);
+
+             return $this->successResponse(null, $message);
          } catch (\Exception $e) {
              return $this->errorResponse($e->getMessage());
          }
      }
 
-    /**
-     * @OA\Post(
-     *     path="/admin/deposit",
-     *     operationId="adminDeposit",
-     *     tags={"Administration"},
-     *     summary="Effectuer un dépôt sur le compte d'un client par numéro de téléphone",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\RequestBody(
-     *         required=true,
-     *         @OA\JsonContent(
-     *             required={"telephone","montant"},
-     *             @OA\Property(property="telephone", type="string", example="705334611"),
-     *             @OA\Property(property="montant", type="number", format="float", example=50000),
-     *             @OA\Property(property="note", type="string", example="Dépôt client")
-     *         )
-     *     ),
-     *     @OA\Response(
-     *         response=201,
-     *         description="Dépôt effectué avec succès",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Dépôt effectué avec succès")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Non autorisé"),
-     *     @OA\Response(response=404, description="Client non trouvé")
-     * )
-     */
-    public function deposit(Request $request)
+    private function sendUserNotificationEmail(User $user, string $type, ?string $motif = null)
     {
+        if (!$user->email) return;
+
+        $subject = $type === 'approval' ? "Inscription approuvée - {$user->nom} {$user->prenom}" : "Inscription rejetée - {$user->nom} {$user->prenom}";
+        $message = $type === 'approval'
+            ? "Félicitations ! Votre inscription en tant que {$user->type} a été approuvée par l'administrateur. Vous pouvez maintenant accéder à toutes les fonctionnalités de l'application."
+            : "Nous regrettons de vous informer que votre inscription en tant que {$user->type} a été rejetée par l'administrateur. Motif : {$motif}. Vous pouvez contacter le support pour plus d'informations.";
+
+        $htmlContent = View::make('emails.transaction-notification', [
+            'transaction' => null,
+            'message' => $message,
+            'role' => $type === 'approval' ? 'user_approval' : 'user_rejection'
+        ])->render();
+
         try {
-            $data = $request->validate([
-                MessagesErreursRequests::VALIDATION_TELEPHONE->value => MessagesErreursRequests::VALIDATION_TELEPHONE_RULES->value,
-                MessagesErreursRequests::VALIDATION_MONTANT->value => 'required|numeric|min:0.01',
-                MessagesErreursRequests::VALIDATION_NOTE->value => MessagesErreursRequests::VALIDATION_NOTE_RULES->value,
-            ]);
-
-            // Trouver le client par téléphone
-            $client = User::where('telephone', $data['telephone'])
-                          ->where('type', UserType::CLIENT->value)
-                          ->first();
-
-            if (!$client) {
-                return $this->errorResponse('Client non trouvé', 404);
-            }
-
-            // Trouver le compte du client
-            $compte = $client->comptes->first();
-            if (!$compte) {
-                return $this->errorResponse('Aucun compte trouvé pour ce client', 404);
-            }
-
-            // Créer la transaction de dépôt
-            \App\Models\Transaction::create([
-                'type' => TransactionType::DEPOT->value,
-                'montant' => $data['montant'],
-                'reference' => 'DEP-ADMIN-' . strtoupper(uniqid()),
-                'statut' => TransactionStatus::REUSSIE->value,
-                'note' => $data['note'] ?? 'Dépôt effectué par l\'admin',
-                'compte_emetteur_id' => null,
-                'compte_recepteur_id' => $compte->id,
-                'date_transaction' => now(),
-            ]);
-
-            return $this->respondCreated(null, ResponseMessage::DEPOSIT_SUCCESS->value);
+            Mail::html($htmlContent, function ($mail) use ($user, $subject) {
+                $mail->to($user->email)->subject($subject);
+            });
+            \Illuminate\Support\Facades\Log::info("Email de {$type} envoyé", ['user_id' => $user->id, 'email' => $user->email]);
         } catch (\Exception $e) {
-            return $this->errorResponse($e->getMessage());
+            \Illuminate\Support\Facades\Log::error("Erreur envoi email {$type}", ['user_id' => $user->id, 'email' => $user->email, 'error' => $e->getMessage()]);
         }
     }
+
+    private function sendBalanceRequestNotificationEmail(User $supplier, string $type, ?float $amount = null, ?string $motif = null)
+    {
+        if (!$supplier->email) return;
+
+        if ($type === 'approved') {
+            $subject = "Demande de solde approuvée - {$supplier->nom} {$supplier->prenom}";
+            $message = "Félicitations ! Votre demande de solde de " . number_format($amount, 0, ',', ' ') . " XOF a été approuvée par l'administrateur. Le montant a été ajouté à votre compte.";
+        } else {
+            $subject = "Demande de solde rejetée - {$supplier->nom} {$supplier->prenom}";
+            $message = "Nous regrettons de vous informer que votre demande de solde a été rejetée par l'administrateur. Motif : {$motif}. Vous pouvez contacter le support pour plus d'informations.";
+        }
+
+        $htmlContent = View::make('emails.transaction-notification', [
+            'transaction' => null,
+            'message' => $message,
+            'role' => 'balance_request_' . $type
+        ])->render();
+
+        try {
+            Mail::html($htmlContent, function ($mail) use ($supplier, $subject) {
+                $mail->to($supplier->email)->subject($subject);
+            });
+            \Illuminate\Support\Facades\Log::info("Email de {$type} de demande de solde envoyé", ['supplier_id' => $supplier->id, 'email' => $supplier->email]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Erreur envoi email {$type} demande de solde", ['supplier_id' => $supplier->id, 'email' => $supplier->email, 'error' => $e->getMessage()]);
+        }
+    }
+
+    private function sendAdminConfirmationEmail(string $action, User $user, ?string $motif = null)
+    {
+        $admin = Auth::user();
+        if (!$admin || !$admin->email) return;
+
+        $actionLabels = [
+            'approve' => 'approbation',
+            'reject' => 'rejet',
+            'suspend' => 'suspension',
+            'unsuspend' => 'réactivation',
+            'ban' => 'bannissement',
+            'unban' => 'débannissement',
+            'delete' => 'suppression',
+            'deposit' => 'dépôt',
+            'approve_balance_request' => 'approbation de demande de solde',
+            'reject_balance_request' => 'rejet de demande de solde'
+        ];
+
+        $subject = ucfirst($actionLabels[$action] ?? $action) . " d'utilisateur - {$user->nom} {$user->prenom}";
+        $message = "Vous avez effectué l'action '{$actionLabels[$action]}' sur l'utilisateur {$user->nom} {$user->prenom} ({$user->telephone}).";
+        if ($motif) $message .= " Motif : {$motif}.";
+
+        $htmlContent = View::make('emails.transaction-notification', [
+            'transaction' => null,
+            'message' => $message,
+            'role' => 'admin_confirmation'
+        ])->render();
+
+        try {
+            Mail::html($htmlContent, function ($mail) use ($admin, $subject) {
+                $mail->to($admin->email)->subject($subject);
+            });
+            \Illuminate\Support\Facades\Log::info("Email de confirmation {$action} envoyé à l'admin", ['admin_id' => $admin->id, 'user_id' => $user->id]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error("Erreur envoi email confirmation admin", ['admin_id' => $admin->id, 'error' => $e->getMessage()]);
+        }
+    }
+
+
 
     /**
      * @OA\Put(
@@ -473,33 +936,6 @@ class AdminController extends Controller
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/admin/users/{user}/ban",
-     *     operationId="banUser",
-     *     tags={"Administration"},
-     *     summary="Bannir un utilisateur",
-     *     description="Bloque définitivement l'accès aux transactions pour cet utilisateur. Toutes les tentatives de transaction seront rejetées.",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="user",
-     *         in="path",
-     *         required=true,
-     *         description="ID de l'utilisateur à bannir",
-     *         @OA\Schema(type="string", format="uuid")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Utilisateur banni avec succès",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Utilisateur banni")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Accès non autorisé - Réservé aux administrateurs"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
     public function banUser(User $user)
     {
         try {
@@ -514,33 +950,6 @@ class AdminController extends Controller
         }
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/admin/users/{user}/unban",
-     *     operationId="unbanUser",
-     *     tags={"Administration"},
-     *     summary="Débannir un utilisateur",
-     *     description="Restaure l'accès aux transactions pour un utilisateur précédemment banni.",
-     *     security={{"bearerAuth":{}}},
-     *     @OA\Parameter(
-     *         name="user",
-     *         in="path",
-     *         required=true,
-     *         description="ID de l'utilisateur à débannir",
-     *         @OA\Schema(type="string", format="uuid")
-     *     ),
-     *     @OA\Response(
-     *         response=200,
-     *         description="Utilisateur débanni avec succès",
-     *         @OA\JsonContent(
-     *             @OA\Property(property="status", type="string", example="success"),
-     *             @OA\Property(property="message", type="string", example="Utilisateur débanni")
-     *         )
-     *     ),
-     *     @OA\Response(response=403, description="Accès non autorisé - Réservé aux administrateurs"),
-     *     @OA\Response(response=404, description="Utilisateur non trouvé")
-     * )
-     */
     public function unbanUser(User $user)
     {
         try {
@@ -618,7 +1027,7 @@ class AdminController extends Controller
             if (!$success) {
                 return $this->errorResponse('Erreur lors de la mise à jour', 500);
             }
-            $this->adminService->logAdminAction(Auth::id(), 'update_global_fees', null, $request->all());
+            $this->adminService->logAdminAction((int) Auth::id(), 'update_global_fees', null, $request->all());
             return $this->successResponse(null, 'Frais globaux mis à jour');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());

@@ -25,6 +25,9 @@ class Compte extends Model
         'code_marchand',
         'statut',
         'utilisateur_id',
+        'client_id',
+        'type_compte',
+        'devise',
         'qr_code',
     ];
 
@@ -55,5 +58,10 @@ class Compte extends Model
     public function getTypeAttribute(): ?string
     {
         return $this->utilisateur?->type;
+    }
+
+    public function getRouteKeyName()
+    {
+        return 'numero_compte';
     }
 }

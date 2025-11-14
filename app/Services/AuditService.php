@@ -7,7 +7,7 @@ use App\Models\AdminAction;
 
 class AuditService implements AuditServiceInterface
 {
-    public function logAction(int $adminId, string $actionType, ?int $targetUserId = null, ?array $details = null): void
+    public function logAction(string $adminId, string $actionType, ?string $targetUserId = null, ?array $details = null): void
     {
         AdminAction::create([
             'admin_id' => $adminId,

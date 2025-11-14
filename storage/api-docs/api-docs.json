@@ -20,7 +20,8 @@
                 "tags": [
                     "Authentification"
                 ],
-                "summary": "Inscription d'un nouvel utilisateur",
+                "summary": "Inscription d'un nouvel utilisateur avec envoi d'email automatique",
+                "description": "Crée un nouveau compte utilisateur et envoie automatiquement un email de confirmation. Pour les commerçants et fournisseurs, le compte sera en attente d'approbation par un administrateur.",
                 "operationId": "registerUser",
                 "requestBody": {
                     "required": true,
@@ -59,6 +60,7 @@
                                         "example": "password123"
                                     },
                                     "type": {
+                                        "description": "Type d'utilisateur : client (actif immédiatement), commerçant/fournisseur (en attente d'approbation)",
                                         "type": "string",
                                         "enum": [
                                             "admin",
@@ -82,11 +84,57 @@
                                 "schema": {
                                     "properties": {
                                         "user": {
-                                            "$ref": "#/components/schemas/User"
+                                            "properties": {
+                                                "nom": {
+                                                    "type": "string",
+                                                    "example": "Dupont"
+                                                },
+                                                "prenom": {
+                                                    "type": "string",
+                                                    "example": "Jean"
+                                                },
+                                                "telephone": {
+                                                    "type": "string",
+                                                    "example": "705334611"
+                                                },
+                                                "email": {
+                                                    "type": "string",
+                                                    "format": "email",
+                                                    "example": "jean.dupont@example.com"
+                                                },
+                                                "type": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "admin",
+                                                        "client",
+                                                        "commercant",
+                                                        "fournisseur"
+                                                    ],
+                                                    "example": "client"
+                                                },
+                                                "statut": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        "actif",
+                                                        "inactif",
+                                                        "en_attente"
+                                                    ],
+                                                    "example": "actif"
+                                                },
+                                                "pin": {
+                                                    "type": "string",
+                                                    "example": "1234"
+                                                }
+                                            },
+                                            "type": "object"
                                         },
                                         "message": {
                                             "type": "string",
                                             "example": "Utilisateur enregistré avec succès"
+                                        },
+                                        "redirect_url": {
+                                            "type": "string",
+                                            "example": "http://localhost:8000/api/login?telephone=705334611"
                                         }
                                     },
                                     "type": "object"
@@ -100,86 +148,14 @@
                 }
             }
         },
-        "/login": {
-            "post": {
-                "tags": [
-                    "Authentification"
-                ],
-                "summary": "Connexion : Vérification téléphone et envoi OTP",
-                "operationId": "loginUser",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "telephone"
-                                ],
-                                "properties": {
-                                    "telephone": {
-                                        "description": "Numéro de téléphone",
-                                        "type": "string",
-                                        "example": "705334611"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "OTP envoyé",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "OTP envoyé"
-                                        },
-                                        "requires_otp": {
-                                            "type": "boolean",
-                                            "example": true
-                                        },
-                                        "email": {
-                                            "type": "string",
-                                            "example": "user@example.com"
-                                        },
-                                        "phone_number": {
-                                            "type": "string",
-                                            "example": "705334611"
-                                        },
-                                        "otp_sent": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Numéro de téléphone non trouvé"
-                    },
-                    "500": {
-                        "description": "Erreur d'envoi d'SMS"
-                    }
-                }
-            }
-        },
+        "/login": {},
         "/logout": {
             "post": {
                 "tags": [
                     "Authentification"
                 ],
                 "summary": "Vérifier l'OTP et déconnecter l'utilisateur",
-                "operationId": "logoutUser",
+                "operationId": "verifyOtp",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -608,7 +584,7 @@
                     {
                         "name": "compte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -646,7 +622,7 @@
                     {
                         "name": "compte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -673,7 +649,7 @@
                                             "inactif",
                                             "suspendu"
                                         ],
-                                        "example": "actif"
+                                        "example": "inactif"
                                     }
                                 },
                                 "type": "object"
@@ -712,7 +688,7 @@
                     {
                         "name": "compte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -1057,9 +1033,8 @@
                                                                 "example": "transfert"
                                                             },
                                                             "montant": {
-                                                                "type": "number",
-                                                                "format": "float",
-                                                                "example": 50000
+                                                                "type": "string",
+                                                                "example": "-50000.00"
                                                             },
                                                             "frais": {
                                                                 "type": "number",
@@ -1082,6 +1057,10 @@
                                                             "note": {
                                                                 "type": "string",
                                                                 "example": "Paiement de facture"
+                                                            },
+                                                            "date_transaction": {
+                                                                "type": "string",
+                                                                "format": "date-time"
                                                             },
                                                             "numero_envoyer": {
                                                                 "type": "string",
@@ -1392,130 +1371,6 @@
                 ]
             }
         },
-        "/admin/users/{telephone}/approve": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Approuver un utilisateur par numéro de téléphone",
-                "operationId": "approveUser",
-                "parameters": [
-                    {
-                        "name": "telephone",
-                        "in": "path",
-                        "description": "Numéro de téléphone de l'utilisateur à approuver",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "example": "770000040"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Utilisateur approuvé",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Utilisateur approuvé avec succès"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Non autorisé"
-                    },
-                    "404": {
-                        "description": "Utilisateur non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/admin/users/{telephone}/reject": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Rejeter un utilisateur par numéro de téléphone",
-                "operationId": "rejectUser",
-                "parameters": [
-                    {
-                        "name": "telephone",
-                        "in": "path",
-                        "description": "Numéro de téléphone de l'utilisateur à rejeter",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "example": "770000040"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "motif_rejet": {
-                                        "type": "string",
-                                        "example": "Documents insuffisants"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Utilisateur rejeté",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Utilisateur rejeté"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Non autorisé"
-                    },
-                    "404": {
-                        "description": "Utilisateur non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
         "/admin/balance-requests/pending": {
             "get": {
                 "tags": [
@@ -1571,17 +1426,299 @@
                 ]
             }
         },
-        "/admin/balance-requests/{telephone}/approve": {
+        "/admin/actions": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Récupérer l'historique des actions administrateur",
+                "description": "Liste paginée des actions admin avec filtrage par type, admin, utilisateur cible et dates",
+                "operationId": "getAdminActions",
+                "parameters": [
+                    {
+                        "name": "action_type",
+                        "in": "query",
+                        "description": "Filtrer par type d'action",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "approve_user"
+                        }
+                    },
+                    {
+                        "name": "admin_id",
+                        "in": "query",
+                        "description": "Filtrer par ID d'admin",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "target_user_id",
+                        "in": "query",
+                        "description": "Filtrer par ID d'utilisateur cible",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    {
+                        "name": "date_from",
+                        "in": "query",
+                        "description": "Date de début (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "date_to",
+                        "in": "query",
+                        "description": "Date de fin (YYYY-MM-DD)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page (1-100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "default": 15,
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Historique des actions récupéré",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Actions admin récupérées"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "id": {
+                                                                "type": "integer",
+                                                                "example": 1
+                                                            },
+                                                            "admin": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string",
+                                                                        "format": "uuid"
+                                                                    },
+                                                                    "nom": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "prenom": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            },
+                                                            "action_type": {
+                                                                "type": "string",
+                                                                "example": "approve_user"
+                                                            },
+                                                            "target_user": {
+                                                                "properties": {
+                                                                    "id": {
+                                                                        "type": "string",
+                                                                        "format": "uuid"
+                                                                    },
+                                                                    "nom": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "prenom": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "telephone": {
+                                                                        "type": "string"
+                                                                    }
+                                                                },
+                                                                "type": "object",
+                                                                "nullable": true
+                                                            },
+                                                            "details": {
+                                                                "type": "object",
+                                                                "example": {
+                                                                    "action": "approve"
+                                                                }
+                                                            },
+                                                            "created_at": {
+                                                                "type": "string",
+                                                                "format": "date-time"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/admin/users/{telephone}/action": {
             "post": {
                 "tags": [
                     "Administration"
                 ],
-                "summary": "Approuver une demande de solde",
-                "operationId": "approveBalanceRequest",
+                "summary": "Effectuer une action sur un utilisateur (approuver, rejeter, suspendre, bannir, dépôt)",
+                "operationId": "userAction",
                 "parameters": [
                     {
                         "name": "telephone",
                         "in": "path",
+                        "description": "Numéro de téléphone de l'utilisateur",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "770000040"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "action"
+                                ],
+                                "properties": {
+                                    "action": {
+                                        "description": "Action à effectuer",
+                                        "type": "string",
+                                        "enum": [
+                                            "approve",
+                                            "reject",
+                                            "suspend",
+                                            "unsuspend",
+                                            "ban",
+                                            "unban",
+                                            "delete",
+                                            "deposit"
+                                        ],
+                                        "example": "approve"
+                                    },
+                                    "motif_rejet": {
+                                        "description": "Requis pour reject",
+                                        "type": "string",
+                                        "example": "Documents insuffisants"
+                                    },
+                                    "montant": {
+                                        "description": "Requis pour deposit",
+                                        "type": "number",
+                                        "format": "float",
+                                        "example": 50000
+                                    },
+                                    "note": {
+                                        "description": "Optionnel pour deposit",
+                                        "type": "string",
+                                        "example": "Dépôt client"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Action effectuée avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Utilisateur approuvé avec succès"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Action invalide ou déjà effectuée"
+                    },
+                    "403": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Utilisateur non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/admin/balance-requests/{telephone}/action": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "summary": "Effectuer une action sur une demande de solde (approuver, rejeter)",
+                "operationId": "balanceRequestAction",
+                "parameters": [
+                    {
+                        "name": "telephone",
+                        "in": "path",
+                        "description": "Numéro de téléphone du fournisseur",
                         "required": true,
                         "schema": {
                             "type": "string",
@@ -1589,9 +1726,38 @@
                         }
                     }
                 ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "action"
+                                ],
+                                "properties": {
+                                    "action": {
+                                        "description": "Action à effectuer sur la demande de solde",
+                                        "type": "string",
+                                        "enum": [
+                                            "approve",
+                                            "reject"
+                                        ],
+                                        "example": "approve"
+                                    },
+                                    "motif_rejet": {
+                                        "description": "Requis pour reject",
+                                        "type": "string",
+                                        "example": "Montant trop élevé"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
                 "responses": {
                     "200": {
-                        "description": "Demande approuvée",
+                        "description": "Action effectuée avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1610,151 +1776,14 @@
                             }
                         }
                     },
-                    "403": {
-                        "description": "Non autorisé"
-                    },
-                    "404": {
-                        "description": "Demande non trouvée"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/admin/balance-requests/{telephone}/reject": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Rejeter une demande de solde",
-                "operationId": "rejectBalanceRequest",
-                "parameters": [
-                    {
-                        "name": "telephone",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "example": "771234567"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "motif_rejet": {
-                                        "type": "string",
-                                        "example": "Montant trop élevé"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Demande rejetée",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Demande de solde rejetée"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
+                    "400": {
+                        "description": "Action invalide ou motif manquant"
                     },
                     "403": {
                         "description": "Non autorisé"
                     },
                     "404": {
-                        "description": "Demande non trouvée"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/admin/deposit": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Effectuer un dépôt sur le compte d'un client par numéro de téléphone",
-                "operationId": "adminDeposit",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "telephone",
-                                    "montant"
-                                ],
-                                "properties": {
-                                    "telephone": {
-                                        "type": "string",
-                                        "example": "705334611"
-                                    },
-                                    "montant": {
-                                        "type": "number",
-                                        "format": "float",
-                                        "example": 50000
-                                    },
-                                    "note": {
-                                        "type": "string",
-                                        "example": "Dépôt client"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Dépôt effectué avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Dépôt effectué avec succès"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Non autorisé"
-                    },
-                    "404": {
-                        "description": "Client non trouvé"
+                        "description": "Demande de solde non trouvée"
                     }
                 },
                 "security": [
@@ -1808,116 +1837,6 @@
                                         "message": {
                                             "type": "string",
                                             "example": "Droits de transfert mis à jour"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Accès non autorisé - Réservé aux administrateurs"
-                    },
-                    "404": {
-                        "description": "Utilisateur non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/admin/users/{user}/ban": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Bannir un utilisateur",
-                "description": "Bloque définitivement l'accès aux transactions pour cet utilisateur. Toutes les tentatives de transaction seront rejetées.",
-                "operationId": "banUser",
-                "parameters": [
-                    {
-                        "name": "user",
-                        "in": "path",
-                        "description": "ID de l'utilisateur à bannir",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Utilisateur banni avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Utilisateur banni"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "Accès non autorisé - Réservé aux administrateurs"
-                    },
-                    "404": {
-                        "description": "Utilisateur non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/api/admin/users/{user}/unban": {
-            "post": {
-                "tags": [
-                    "Administration"
-                ],
-                "summary": "Débannir un utilisateur",
-                "description": "Restaure l'accès aux transactions pour un utilisateur précédemment banni.",
-                "operationId": "unbanUser",
-                "parameters": [
-                    {
-                        "name": "user",
-                        "in": "path",
-                        "description": "ID de l'utilisateur à débannir",
-                        "required": true,
-                        "schema": {
-                            "type": "string",
-                            "format": "uuid"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Utilisateur débanni avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Utilisateur débanni"
                                         }
                                     },
                                     "type": "object"
@@ -2177,6 +2096,79 @@
                 ]
             }
         },
+        "/sendOTP": {
+            "post": {
+                "tags": [
+                    "Authentification"
+                ],
+                "summary": "Connexion : Vérification téléphone et envoi OTP",
+                "operationId": "sendOtp",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "telephone"
+                                ],
+                                "properties": {
+                                    "telephone": {
+                                        "description": "Numéro de téléphone",
+                                        "type": "string",
+                                        "example": "705334611"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "OTP envoyé",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "OTP envoyé"
+                                        },
+                                        "requires_otp": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "email": {
+                                            "type": "string",
+                                            "example": "user@example.com"
+                                        },
+                                        "phone_number": {
+                                            "type": "string",
+                                            "example": "705334611"
+                                        },
+                                        "otp_sent": {
+                                            "type": "boolean",
+                                            "example": true
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Numéro de téléphone non trouvé"
+                    },
+                    "500": {
+                        "description": "Erreur d'envoi d'SMS"
+                    }
+                }
+            }
+        },
         "/logout/otp": {
             "get": {
                 "tags": [
@@ -2225,8 +2217,8 @@
                 "tags": [
                     "Authentification"
                 ],
-                "summary": "Deuxième étape : Vérification du code OTP",
-                "operationId": "verifyOtp",
+                "summary": "Login",
+                "operationId": "login",
                 "requestBody": {
                     "required": true,
                     "content": {
@@ -2376,7 +2368,7 @@
                     {
                         "name": "compte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -2413,7 +2405,7 @@
                     {
                         "name": "compte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte",
                         "required": true,
                         "schema": {
                             "type": "string"
@@ -2684,11 +2676,6 @@
             },
             "User": {
                 "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "example": "uuid-user"
-                    },
                     "nom": {
                         "type": "string",
                         "example": "Dupont"
@@ -2707,6 +2694,7 @@
                         "example": "jean.dupont@example.com"
                     },
                     "type": {
+                        "description": "Type d'utilisateur : admin (administrateur), client (utilisateur standard, actif immédiatement), commercant/fournisseur (comptes professionnels, en attente d'approbation)",
                         "type": "string",
                         "enum": [
                             "admin",
@@ -2717,11 +2705,13 @@
                         "example": "client"
                     },
                     "statut": {
+                        "description": "Statut du compte : actif (compte opérationnel), inactif (compte désactivé), en_attente (en attente d'approbation pour commercants/fournisseurs), suspendu (compte temporairement suspendu)",
                         "type": "string",
                         "enum": [
                             "actif",
                             "inactif",
-                            "en_attente"
+                            "en_attente",
+                            "suspendu"
                         ],
                         "example": "actif"
                     },
@@ -2729,14 +2719,6 @@
                         "description": "Code PIN à 4 chiffres",
                         "type": "string",
                         "example": "1234"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
-                        "type": "string",
-                        "format": "date-time"
                     }
                 },
                 "type": "object"
@@ -2750,7 +2732,7 @@
                     },
                     "numero_compte": {
                         "type": "string",
-                        "example": "CMPT-001"
+                        "example": "RA14112583"
                     },
                     "titulaire": {
                         "type": "string",
@@ -2793,11 +2775,6 @@
             },
             "Transaction": {
                 "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "example": "uuid-transaction"
-                    },
                     "type": {
                         "type": "string",
                         "enum": [
@@ -2810,13 +2787,12 @@
                         "example": "transfert"
                     },
                     "montant": {
-                        "description": "Montant de base de la transaction",
-                        "type": "number",
-                        "format": "float",
-                        "example": 50000
+                        "description": "Montant de la transaction avec signe (+ pour crédits, - pour débits)",
+                        "type": "string",
+                        "example": "-50000.00"
                     },
                     "frais": {
-                        "description": "Frais totaux appliqués (frais système + taxes utilisateur)",
+                        "description": "Montant total des frais calculés et appliqués à la transaction (en FCFA, pas un pourcentage)",
                         "type": "number",
                         "format": "float",
                         "example": 7.5
@@ -2839,25 +2815,7 @@
                         "example": "Paiement de facture",
                         "nullable": true
                     },
-                    "compte_emetteur_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "nullable": true
-                    },
-                    "compte_recepteur_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "nullable": true
-                    },
                     "date_transaction": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "created_at": {
-                        "type": "string",
-                        "format": "date-time"
-                    },
-                    "updated_at": {
                         "type": "string",
                         "format": "date-time"
                     }

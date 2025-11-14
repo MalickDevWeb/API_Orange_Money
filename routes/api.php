@@ -23,14 +23,14 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 });
 
 Route::post('register', [AuthController::class, 'register']);
-Route::post('login', [AuthController::class, 'login']);
+Route::post('sendOTP', [AuthController::class, 'login'])->name('sendOTP');
 Route::post('login/otp', [AuthController::class, 'verifyOtp']);
 Route::post('send-otp', [AuthController::class, 'sendOtp']);
 Route::post('verify-otp-email', [AuthController::class, 'verifyOtpEmail']);
 
 Route::middleware(T::passport->value)->group(function () {
-    Route::get('logout/otp', [AuthController::class, 'sendLogoutOtp']);
-    Route::post('logout', [AuthController::class, 'verifyLogoutOtp']);
+    Route::get('logout/otp', [AuthController::class, 'sendLogoutOtp'])->name('sendOtp');
+    Route::post('logout', [AuthController::class, 'verifyLogoutOtp'])->name('verifyOtp');
     Route::get('user', [AuthController::class, 'user']);
     Route::put('user', [UserController::class, 'updateProfile']);
 });
@@ -61,23 +61,17 @@ Route::middleware(T::passport->value)->group(function () {
 // Routes d'administration
 Route::middleware(T::passport->value)->prefix('admin')->group(function () {
     Route::get('users/pending', [AdminController::class, 'getPendingUsers']);
-    Route::post('users/{telephone}/approve', [AdminController::class, 'approveUser']);
-    Route::post('users/{telephone}/reject', [AdminController::class, 'rejectUser']);
+    Route::post('users/{telephone}/action', [AdminController::class, 'userAction']);
     Route::put('users/{user}/rights', [AdminController::class, 'updateUserRights']);
-    Route::post('users/{user}/ban', [AdminController::class, 'banUser']);
-    Route::post('users/{user}/unban', [AdminController::class, 'unbanUser']);
     Route::put('users/{user}/tax', [AdminController::class, 'setUserTax']);
     Route::post('users/{user}/comptes', [AdminController::class, 'createCompteForUser']);
     Route::get('comptes', [AdminController::class, 'getAllComptes']);
     Route::get('statistics/daily', [AdminController::class, 'getDailyStatistics']);
     Route::put('fees/global', [AdminController::class, 'updateGlobalFees']);
     Route::get('balance-requests/pending', [AdminController::class, 'getPendingBalanceRequests']);
-    Route::post('balance-requests/{telephone}/approve', [AdminController::class, 'approveBalanceRequest']);
-    Route::post('balance-requests/{telephone}/reject', [AdminController::class, 'rejectBalanceRequest']);
-    Route::post('deposit', [AdminController::class, 'deposit']);
+    Route::get('actions', [AdminController::class, 'getAdminActions']);
+    Route::post('balance-requests/{telephone}/action', [AdminController::class, 'balanceRequestAction']);
 });
 
 // Routes fournisseurs
-Route::middleware(T::passport->value)->prefix('suppliers')->group(function () {
-    // Balance request moved to transactions section
-});
+Route::middleware(T::passport->value)->prefix('suppliers')->group(function () {});

@@ -57,7 +57,7 @@ class AdminService implements AdminServiceInterface
         return $this->userRightsService->setUserTax($userId, $taxPercentage);
     }
 
-    public function logAdminAction(int $adminId, string $actionType, ?int $targetUserId = null, ?array $details = null): void
+    public function logAdminAction(string $adminId, string $actionType, ?string $targetUserId = null, ?array $details = null): void
     {
         $this->auditService->logAction($adminId, $actionType, $targetUserId, $details);
     }

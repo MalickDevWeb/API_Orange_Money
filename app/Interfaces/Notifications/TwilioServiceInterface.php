@@ -20,6 +20,11 @@ interface TwilioServiceInterface
     public function sendTransactionNotification(string $phoneNumber, array $transactionData): bool;
 
     /**
+     * Envoyer une notification de transaction avec modèle Transaction
+     */
+    public function sendTransactionNotificationWithModel(string $phoneNumber, \App\Models\Transaction $transaction): bool;
+
+    /**
      * Vérifier le statut d'un message
      */
     public function checkMessageStatus(string $messageSid): ?string;

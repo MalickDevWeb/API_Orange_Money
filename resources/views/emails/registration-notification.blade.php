@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notification de Transaction - Orange Money</title>
+    <title>Bienvenue sur Orange Money</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -34,7 +34,7 @@
         .content {
             padding: 30px 20px;
         }
-        .transaction-details {
+        .user-details {
             background-color: #f8f9fa;
             border-radius: 6px;
             padding: 20px;
@@ -61,13 +61,6 @@
             color: #212529;
             font-weight: 500;
         }
-        .amount {
-            font-size: 24px;
-            font-weight: 700;
-            color: #FF6B35;
-            text-align: center;
-            margin: 20px 0;
-        }
         .status {
             display: inline-block;
             padding: 6px 12px;
@@ -76,17 +69,13 @@
             font-weight: 600;
             text-transform: uppercase;
         }
-        .status.success {
+        .status.active {
             background-color: #d4edda;
             color: #155724;
         }
         .status.pending {
             background-color: #fff3cd;
             color: #856404;
-        }
-        .status.failed {
-            background-color: #f8d7da;
-            color: #721c24;
         }
         .footer {
             background-color: #f8f9fa;
@@ -110,57 +99,54 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔔 Notification de Transaction</h1>
-            <p>Orange Money - Service Financier</p>
+            <h1>🎉 Bienvenue sur Orange Money</h1>
+            <p>Service Financier de Confiance</p>
         </div>
 
         <div class="content">
             <h2>{{ $message }}</h2>
 
-            @if($transaction)
-            <div class="amount">
-                {{ $transaction->montant_signe }} FCFA
-            </div>
-
-            <div class="transaction-details">
+            <div class="user-details">
                 <div class="detail-row">
-                    <span class="detail-label">Référence:</span>
-                    <span class="detail-value">{{ $transaction->reference }}</span>
+                    <span class="detail-label">Nom complet:</span>
+                    <span class="detail-value">{{ $user->nom }} {{ $user->prenom }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Type:</span>
-                    <span class="detail-value">{{ ucfirst($transaction->type) }}</span>
+                    <span class="detail-label">Téléphone:</span>
+                    <span class="detail-value">{{ $user->telephone }}</span>
                 </div>
                 <div class="detail-row">
-                    <span class="detail-label">Date:</span>
-                    <span class="detail-value">{{ $transaction->date_transaction->format('d/m/Y H:i') }}</span>
+                    <span class="detail-label">Email:</span>
+                    <span class="detail-value">{{ $user->email }}</span>
+                </div>
+                <div class="detail-row">
+                    <span class="detail-label">Type de compte:</span>
+                    <span class="detail-value">{{ ucfirst($user->type) }}</span>
                 </div>
                 <div class="detail-row">
                     <span class="detail-label">Statut:</span>
                     <span class="detail-value">
-                        <span class="status {{ $transaction->statut == 'reussie' ? 'success' : ($transaction->statut == 'echouee' ? 'failed' : 'pending') }}">
-                            {{ ucfirst($transaction->statut) }}
+                        <span class="status {{ $is_pending ? 'pending' : 'active' }}">
+                            {{ $is_pending ? 'En attente' : 'Actif' }}
                         </span>
                     </span>
                 </div>
-                @if($transaction->note)
-                <div class="detail-row">
-                    <span class="detail-label">Note:</span>
-                    <span class="detail-value">{{ $transaction->note }}</span>
-                </div>
-                @endif
             </div>
-            @endif
 
-            @if($role === 'sender')
+            @if($is_pending)
                 <div class="warning">
-                    <strong>Important:</strong> Conservez cette référence pour toute réclamation ou suivi de transaction.
+                    <strong>Information importante:</strong> Votre compte est en attente d'approbation par un administrateur.
+                    Vous recevrez un email de confirmation une fois l'approbation effectuée.
                 </div>
+            @else
+                <p>
+                    Votre compte est maintenant actif ! Vous pouvez commencer à utiliser toutes les fonctionnalités
+                    d'Orange Money immédiatement.
+                </p>
             @endif
 
             <p>
-                Si vous n'êtes pas à l'origine de cette transaction ou si vous avez des questions,
-                contactez immédiatement notre service client.
+                Si vous avez des questions ou besoin d'assistance, n'hésitez pas à contacter notre service client.
             </p>
 
             <p>
@@ -172,7 +158,7 @@
 
         <div class="footer">
             <p>
-                Cette transaction a été traitée via l'API Orange Money.<br>
+                Cette inscription a été traitée via l'API Orange Money.<br>
                 © {{ date('Y') }} Orange Money - Tous droits réservés.
             </p>
         </div>

@@ -20,6 +20,7 @@ class UserFactory extends Factory
             'telephone' => $this->faker->unique()->numerify('77########'),
             'email' => $this->faker->unique()->safeEmail(),
             'type' => 'client',
+            'statut' => 'actif',
             'password' => Hash::make('papa1732'),
             'email_verified_at' => now(),
             'remember_token' => Str::random(10),
@@ -30,6 +31,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn(array $attributes) => [
             'type' => 'admin',
+            'statut' => 'actif',
         ]);
     }
 
@@ -37,6 +39,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn(array $attributes) => [
             'type' => 'commercant',
+            'statut' => 'en_attente',
         ]);
     }
 
@@ -44,6 +47,7 @@ class UserFactory extends Factory
     {
         return $this->state(fn(array $attributes) => [
             'type' => 'fournisseur',
+            'statut' => 'en_attente',
         ]);
     }
 }

@@ -5,9 +5,11 @@ namespace App\Services;
 use Exception;
 use App\Models\User;
 use App\Interfaces\Auth\AuthInterfaceRepository;
+use App\Dtos\UserResponseDto;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
 use App\Events\UserLoggedIn;
+use App\Events\UserRegistered;
 use App\Enums\ResponseMessage;
 use App\Enums\MessagesErreursRequests;
 
@@ -51,7 +53,12 @@ class AuthService implements AuthInterfaceService
                $data['statut'] = (in_array($data['type'], ['commercant', 'fournisseur'])) ? 'en_attente' : 'actif';
            }
 
-           return $this->authRepo->register($data);
+           $user = $this->authRepo->register($data);
+
+           // Fire the registration event to send email
+           event(new UserRegistered($user));
+
+           return $user;
        } catch (Exception $e) {
            Log::error('Erreur lors de la création de l\'utilisateur : ' . $e->getMessage(), [
                'trace' => $e->getTraceAsString(),
@@ -276,6 +283,11 @@ class AuthService implements AuthInterfaceService
              ]);
              throw $e;
          }
+     }
+
+     public function createUserResponseDto(User $user): UserResponseDto
+     {
+         return UserResponseDto::fromUser($user);
      }
 
 }

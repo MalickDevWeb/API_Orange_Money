@@ -19,7 +19,7 @@ class UserObserver
             'numero_compte' => GeneratesCompteNumber::generateNumeroCompte($user->nom, $user->prenom),
             'titulaire' => $user->nom . ' ' . $user->prenom,
             'nom_compte' => 'compte principal', // Premier compte = compte principal
-            'statut' => 'actif', // Premier compte = actif
+            'statut' => $user->statut, // Statut du compte = statut de l'utilisateur
             'utilisateur_id' => $user->id,
             'client_id' => $user->id, // Utilise l'ID utilisateur comme client_id
             'type_compte' => 'courant', // Type par défaut
@@ -33,7 +33,10 @@ class UserObserver
      */
     public function updated(User $user): void
     {
-        //
+        // Mettre à jour le statut des comptes si le statut de l'utilisateur change
+        if ($user->wasChanged('statut')) {
+            $user->comptes()->update(['statut' => $user->statut]);
+        }
     }
 
     /**

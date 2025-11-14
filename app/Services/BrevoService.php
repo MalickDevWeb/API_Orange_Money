@@ -73,6 +73,21 @@ class BrevoService implements BrevoServiceInterface
     }
 
     /**
+     * Envoyer un email de notification de transaction avec modèle Transaction
+     */
+    public function sendTransactionNotificationWithModel(string $email, \App\Models\Transaction $transaction): array
+    {
+        $subject = $this->buildTransactionSubject([
+            'type' => $transaction->type,
+            'reference' => $transaction->reference
+        ]);
+
+        $htmlContent = $this->buildTransactionHtmlContentWithModel($transaction);
+
+        return $this->sendMail($email, $subject, $htmlContent);
+    }
+
+    /**
      * Envoyer un email OTP
      */
     public function sendOtpEmail(string $email, string $otp): array
@@ -153,6 +168,63 @@ class BrevoService implements BrevoServiceInterface
                         <p><strong>Montant :</strong> <span class='amount'>{$montant} FCFA</span></p>
                         <p><strong>Référence :</strong> {$reference}</p>
                         <p><strong>Date :</strong> {$date}</p>
+                    </div>
+                    <p>Votre {$typeLabel} a été effectué avec succès.</p>
+                    <p>Si vous n'êtes pas à l'origine de cette transaction, veuillez contacter immédiatement notre service client.</p>
+                </div>
+                <div class='footer'>
+                    <p>Cette notification a été envoyée automatiquement par Orange Money.</p>
+                    <p>© 2024 Orange Money - Tous droits réservés</p>
+                </div>
+            </div>
+        </body>
+        </html>";
+    }
+
+    /**
+     * Construire le contenu HTML de l'email de transaction avec modèle Transaction
+     */
+    private function buildTransactionHtmlContentWithModel(\App\Models\Transaction $transaction): string
+    {
+        $typeLabels = [
+            'depot' => 'dépôt',
+            'retrait' => 'retrait',
+            'transfert' => 'transfert',
+            'paiement' => 'paiement',
+            'achat_virtuel' => 'achat virtuel'
+        ];
+
+        $typeLabel = $typeLabels[$transaction->type] ?? 'transaction';
+
+        return "
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset='UTF-8'>
+            <title>Notification de Transaction - Orange Money</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: linear-gradient(135deg, #FF6B35, #F7931E); color: white; padding: 20px; text-align: center; border-radius: 8px 8px 0 0; }
+                .content { background: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px; }
+                .transaction-details { background: white; padding: 20px; border-radius: 6px; margin: 20px 0; border-left: 4px solid #FF6B35; }
+                .amount { font-size: 24px; font-weight: bold; color: #FF6B35; }
+                .footer { text-align: center; margin-top: 30px; color: #666; font-size: 12px; }
+            </style>
+        </head>
+        <body>
+            <div class='container'>
+                <div class='header'>
+                    <h1>🔔 Notification de Transaction</h1>
+                    <p>Orange Money - Confirmation de {$typeLabel}</p>
+                </div>
+                <div class='content'>
+                    <div class='transaction-details'>
+                        <h2>Détails de la transaction</h2>
+                        <p><strong>Type :</strong> " . ucfirst($typeLabel) . "</p>
+                        <p><strong>Montant :</strong> <span class='amount'>{$transaction->montant_signe} FCFA</span></p>
+                        <p><strong>Référence :</strong> {$transaction->reference}</p>
+                        <p><strong>Date :</strong> {$transaction->date_transaction->format('d/m/Y H:i')}</p>
                     </div>
                     <p>Votre {$typeLabel} a été effectué avec succès.</p>
                     <p>Si vous n'êtes pas à l'origine de cette transaction, veuillez contacter immédiatement notre service client.</p>
