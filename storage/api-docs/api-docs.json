@@ -354,532 +354,11 @@
                 ]
             }
         },
-        "/comptes": {
-            "get": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Lister les comptes de l'utilisateur connecté",
-                "description": "Affiche tous les comptes de l'utilisateur connecté avec le compte actif en premier par défaut. Possibilité de filtrer par statut, solde, numéro de compte, etc.",
-                "operationId": "GET::/comptes::App\\Http\\Controllers\\CompteController::index",
-                "parameters": [
-                    {
-                        "name": "statut",
-                        "in": "query",
-                        "description": "Filtrer par statut",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "actif",
-                                "inactif",
-                                "suspendu"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "solde_min",
-                        "in": "query",
-                        "description": "Solde minimum",
-                        "required": false,
-                        "schema": {
-                            "type": "number",
-                            "format": "float"
-                        }
-                    },
-                    {
-                        "name": "solde_max",
-                        "in": "query",
-                        "description": "Solde maximum",
-                        "required": false,
-                        "schema": {
-                            "type": "number",
-                            "format": "float"
-                        }
-                    },
-                    {
-                        "name": "numero_compte",
-                        "in": "query",
-                        "description": "Rechercher par numéro de compte",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "titulaire",
-                        "in": "query",
-                        "description": "Rechercher par titulaire",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Recherche globale dans numéro, titulaire et code marchand",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "sort_by",
-                        "in": "query",
-                        "description": "Champ de tri",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "created_at",
-                                "updated_at",
-                                "numero_compte",
-                                "solde",
-                                "statut"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "sort_direction",
-                        "in": "query",
-                        "description": "Direction du tri",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "asc",
-                                "desc"
-                            ]
-                        }
-                    },
-                    {
-                        "name": "per_page",
-                        "in": "query",
-                        "description": "Nombre d'éléments par page (1-100)",
-                        "required": false,
-                        "schema": {
-                            "type": "integer",
-                            "maximum": 100,
-                            "minimum": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Liste des comptes récupérée avec filtrage et pagination",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Vos comptes récupérés avec succès"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "current_page": {
-                                                    "type": "integer"
-                                                },
-                                                "data": {
-                                                    "type": "array",
-                                                    "items": {
-                                                        "properties": {
-                                                            "numero_compte": {
-                                                                "type": "string",
-                                                                "example": "CMPT-001"
-                                                            },
-                                                            "titulaire": {
-                                                                "type": "string",
-                                                                "example": "John Doe"
-                                                            },
-                                                            "solde": {
-                                                                "type": "number",
-                                                                "format": "float",
-                                                                "example": 15000.5
-                                                            },
-                                                            "statut": {
-                                                                "type": "string",
-                                                                "example": "actif"
-                                                            },
-                                                            "code_marchand": {
-                                                                "type": "string",
-                                                                "example": "MRC001",
-                                                                "nullable": true
-                                                            },
-                                                            "qr_code": {
-                                                                "type": "string",
-                                                                "nullable": true
-                                                            }
-                                                        },
-                                                        "type": "object"
-                                                    }
-                                                },
-                                                "per_page": {
-                                                    "type": "integer"
-                                                },
-                                                "total": {
-                                                    "type": "integer"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Non autorisé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "post": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Créer un compte secondaire",
-                "description": "Création de comptes secondaires pour utilisateurs existants. Le premier compte 'compte principal' est créé automatiquement lors de l'inscription.",
-                "operationId": "POST::/comptes::App\\Http\\Controllers\\CompteController::store",
-                "requestBody": {
-                    "description": "Seul le nom du compte est requis. Tous les autres champs (numéro, solde, devise, etc.) sont auto-générés.",
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "nom_compte"
-                                ],
-                                "properties": {
-                                    "nom_compte": {
-                                        "description": "Nom unique du compte secondaire (différent de 'compte principal')",
-                                        "type": "string",
-                                        "example": "compteprive"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "201": {
-                        "description": "Compte secondaire créé avec succès (statut inactif par défaut)",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Compte"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Nom de compte déjà utilisé ou réservé"
-                    },
-                    "403": {
-                        "description": "Administrateur ne peut avoir qu'un compte"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/comptes/{compte}": {
-            "get": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Afficher un compte spécifique",
-                "operationId": "GET::/comptes/{compte}::App\\Http\\Controllers\\CompteController::show",
-                "parameters": [
-                    {
-                        "name": "compte",
-                        "in": "path",
-                        "description": "ID du compte",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Compte trouvé",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Compte"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Compte non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "put": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Mettre à jour un compte",
-                "operationId": "PUT::/comptes/{compte}::App\\Http\\Controllers\\CompteController::update",
-                "parameters": [
-                    {
-                        "name": "compte",
-                        "in": "path",
-                        "description": "ID du compte",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "titulaire": {
-                                        "type": "string",
-                                        "example": "Jane Doe"
-                                    },
-                                    "code_marchand": {
-                                        "type": "string",
-                                        "example": "MRC002"
-                                    },
-                                    "statut": {
-                                        "type": "string",
-                                        "enum": [
-                                            "actif",
-                                            "inactif",
-                                            "suspendu"
-                                        ],
-                                        "example": "actif"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Compte mis à jour",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Compte"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Compte non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            },
-            "delete": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Demander la suppression d'un compte (génère un code de confirmation)",
-                "operationId": "DELETE::/comptes/{compte}::App\\Http\\Controllers\\CompteController::destroy",
-                "parameters": [
-                    {
-                        "name": "compte",
-                        "in": "path",
-                        "description": "ID du compte",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Code de confirmation généré",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Code de confirmation envoyé. Utilisez ce code pour confirmer la suppression."
-                                        },
-                                        "code_sent": {
-                                            "type": "boolean",
-                                            "example": true
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Solde positif ou compte déjà en cours de suppression"
-                    },
-                    "404": {
-                        "description": "Compte non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/balance": {
-            "get": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Consulter le solde du compte actif",
-                "description": "Endpoint commun pour tous les utilisateurs authentifiés permettant de consulter le solde de leur compte actif (compte principal).",
-                "operationId": "GET::/balance::App\\Http\\Controllers\\CompteController::solde",
-                "responses": {
-                    "200": {
-                        "description": "Solde récupéré avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "status": {
-                                            "type": "string",
-                                            "example": "success"
-                                        },
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Solde récupéré avec succès"
-                                        },
-                                        "data": {
-                                            "properties": {
-                                                "solde": {
-                                                    "type": "number",
-                                                    "format": "float",
-                                                    "example": 15000.5
-                                                },
-                                                "numero_compte": {
-                                                    "type": "string",
-                                                    "example": "CMPT-001"
-                                                },
-                                                "nom_compte": {
-                                                    "type": "string",
-                                                    "example": "compte principal"
-                                                }
-                                            },
-                                            "type": "object"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Non autorisé"
-                    },
-                    "404": {
-                        "description": "Aucun compte actif trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
+        "/comptes": {},
+        "/comptes/{compte}": {},
+        "/balance": {},
         "/comptes/activate/{nom_compte}": {},
-        "/comptes/confirm-delete": {
-            "post": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Confirmer la suppression d'un compte avec le code de confirmation",
-                "operationId": "POST::/comptes/confirm-delete::App\\Http\\Controllers\\CompteController::confirmDelete",
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "required": [
-                                    "confirmation_code",
-                                    "compte_id"
-                                ],
-                                "properties": {
-                                    "confirmation_code": {
-                                        "description": "Code de confirmation à 6 chiffres",
-                                        "type": "string",
-                                        "example": "123456"
-                                    },
-                                    "compte_id": {
-                                        "description": "ID du compte à supprimer",
-                                        "type": "string",
-                                        "example": "uuid-compte"
-                                    }
-                                },
-                                "type": "object"
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "Compte supprimé avec succès",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "properties": {
-                                        "message": {
-                                            "type": "string",
-                                            "example": "Compte supprimé avec succès"
-                                        }
-                                    },
-                                    "type": "object"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "Code invalide, expiré ou ne correspond pas au compte"
-                    },
-                    "404": {
-                        "description": "Code ou compte non trouvé"
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
+        "/comptes/confirm-delete": {},
         "/transactions": {
             "get": {
                 "tags": [
@@ -2291,17 +1770,168 @@
                 }
             }
         },
-        "/comptes/me": {
+        "/compte/nouveaucompte": {
+            "post": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Créer un nouveau compte secondaire",
+                "description": "Création d'un compte secondaire pour l'utilisateur connecté. Le compte est créé avec le statut 'inactif' par défaut. Limite : 4 comptes maximum par utilisateur.",
+                "operationId": "POST::/compte/nouveaucompte::App\\Http\\Controllers\\CompteController::nouveaucompte",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "nom_compte"
+                                ],
+                                "properties": {
+                                    "nom_compte": {
+                                        "description": "Nom unique du compte secondaire",
+                                        "type": "string",
+                                        "example": "compte epargne"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Compte créé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Vous avez créé un nouveau compte du nom de compte epargne avec succès. Statut : inactif."
+                                        },
+                                        "data": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Nom de compte déjà utilisé, réservé ou limite de 4 comptes atteinte"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "403": {
+                        "description": "Administrateur ne peut avoir qu'un compte"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/comptes/mesComptes": {
             "get": {
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Afficher les comptes de l'utilisateur connecté",
-                "description": "Affiche tous les comptes de l'utilisateur connecté avec le compte actif en premier par défaut.",
-                "operationId": "GET::/comptes/me::App\\Http\\Controllers\\CompteController::me",
+                "summary": "Récupérer tous les comptes de l'utilisateur",
+                "description": "Liste tous les comptes de l'utilisateur connecté avec le compte actif en premier. Supporte la recherche, les filtres et la pagination.",
+                "operationId": "GET::/comptes/mesComptes::App\\Http\\Controllers\\CompteController::mesComptes",
+                "parameters": [
+                    {
+                        "name": "statut",
+                        "in": "query",
+                        "description": "Filtrer par statut",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "actif",
+                                "inactif",
+                                "suspendu"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "numero_compte",
+                        "in": "query",
+                        "description": "Rechercher par numéro de compte",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "titulaire",
+                        "in": "query",
+                        "description": "Rechercher par titulaire",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Recherche globale dans numéro, titulaire et code marchand",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sort_by",
+                        "in": "query",
+                        "description": "Champ de tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "created_at",
+                                "updated_at",
+                                "numero_compte",
+                                "statut"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sort_direction",
+                        "in": "query",
+                        "description": "Direction du tri",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "asc",
+                                "desc"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Nombre d'éléments par page (1-100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "maximum": 100,
+                            "minimum": 1
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Comptes récupérés avec succès",
+                        "description": "Liste des comptes récupérée avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2315,38 +1945,56 @@
                                             "example": "Vos comptes récupérés avec succès"
                                         },
                                         "data": {
-                                            "type": "array",
-                                            "items": {
-                                                "properties": {
-                                                    "numero_compte": {
-                                                        "type": "string",
-                                                        "example": "CMPT-001"
-                                                    },
-                                                    "titulaire": {
-                                                        "type": "string",
-                                                        "example": "John Doe"
-                                                    },
-                                                    "solde": {
-                                                        "type": "number",
-                                                        "format": "float",
-                                                        "example": 15000.5
-                                                    },
-                                                    "statut": {
-                                                        "type": "string",
-                                                        "example": "actif"
-                                                    },
-                                                    "code_marchand": {
-                                                        "type": "string",
-                                                        "example": "MRC001",
-                                                        "nullable": true
-                                                    },
-                                                    "qr_code": {
-                                                        "type": "string",
-                                                        "nullable": true
+                                            "properties": {
+                                                "current_page": {
+                                                    "type": "integer"
+                                                },
+                                                "data": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "properties": {
+                                                            "numero_compte": {
+                                                                "type": "string",
+                                                                "example": "CMPT-001"
+                                                            },
+                                                            "titulaire": {
+                                                                "type": "string",
+                                                                "example": "John Doe"
+                                                            },
+                                                            "solde": {
+                                                                "type": "number",
+                                                                "format": "float",
+                                                                "example": 15000.5
+                                                            },
+                                                            "statut": {
+                                                                "type": "string",
+                                                                "example": "actif"
+                                                            },
+                                                            "code_marchand": {
+                                                                "type": "string",
+                                                                "example": "MRC001",
+                                                                "nullable": true
+                                                            },
+                                                            "nom_compte": {
+                                                                "type": "string",
+                                                                "example": "compte principal"
+                                                            },
+                                                            "qr_code": {
+                                                                "type": "string",
+                                                                "nullable": true
+                                                            }
+                                                        },
+                                                        "type": "object"
                                                     }
                                                 },
-                                                "type": "object"
-                                            }
+                                                "per_page": {
+                                                    "type": "integer"
+                                                },
+                                                "total": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
@@ -2356,6 +2004,9 @@
                     },
                     "401": {
                         "description": "Non autorisé"
+                    },
+                    "403": {
+                        "description": "Accès refusé pour les fournisseurs en attente"
                     }
                 },
                 "security": [
@@ -2365,77 +2016,603 @@
                 ]
             }
         },
-        "/comptes/{compte}/restore": {
-            "post": {
+        "/comptes/{numeroCompte}": {
+            "get": {
                 "tags": [
                     "Comptes"
                 ],
-                "summary": "Restaurer un compte supprimé",
-                "operationId": "POST::/comptes/{compte}/restore::App\\Http\\Controllers\\CompteController::restore",
+                "summary": "Récupérer un compte spécifique par numéro",
+                "description": "Récupère les détails d'un compte spécifique en utilisant son numéro de compte.",
+                "operationId": "GET::/comptes/{numeroCompte}::App\\Http\\Controllers\\CompteController::showByNumero",
                 "parameters": [
                     {
-                        "name": "compte",
+                        "name": "numeroCompte",
                         "in": "path",
-                        "description": "ID du compte",
+                        "description": "Numéro du compte à récupérer",
                         "required": true,
                         "schema": {
                             "type": "string"
-                        }
+                        },
+                        "example": "CMPT-001"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "Compte restauré",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/Compte"
-                                }
-                            }
-                        }
-                    }
-                },
-                "security": [
-                    {
-                        "bearerAuth": []
-                    }
-                ]
-            }
-        },
-        "/comptes/{compte}/force-delete": {
-            "delete": {
-                "tags": [
-                    "Comptes"
-                ],
-                "summary": "Supprimer définitivement un compte",
-                "operationId": "DELETE::/comptes/{compte}/force-delete::App\\Http\\Controllers\\CompteController::forceDelete",
-                "parameters": [
-                    {
-                        "name": "compte",
-                        "in": "path",
-                        "description": "ID du compte",
-                        "required": true,
-                        "schema": {
-                            "type": "string"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Compte supprimé définitivement",
+                        "description": "Compte trouvé avec succès",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
                                         "message": {
                                             "type": "string",
-                                            "example": "Compte supprimé définitivement"
+                                            "example": "Compte récupéré avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "numero_compte": {
+                                                    "type": "string",
+                                                    "example": "CMPT-001"
+                                                },
+                                                "titulaire": {
+                                                    "type": "string",
+                                                    "example": "John Doe"
+                                                },
+                                                "solde": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 15000.5
+                                                },
+                                                "statut": {
+                                                    "type": "string",
+                                                    "example": "actif"
+                                                },
+                                                "code_marchand": {
+                                                    "type": "string",
+                                                    "example": "MRC001",
+                                                    "nullable": true
+                                                },
+                                                "nom_compte": {
+                                                    "type": "string",
+                                                    "example": "compte principal"
+                                                },
+                                                "qr_code": {
+                                                    "type": "string",
+                                                    "nullable": true
+                                                },
+                                                "created_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                },
+                                                "updated_at": {
+                                                    "type": "string",
+                                                    "format": "date-time"
+                                                }
+                                            },
+                                            "type": "object"
                                         }
                                     },
                                     "type": "object"
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/compte/{numeroCompte}/solde": {
+            "get": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Consulter le solde d'un compte spécifique",
+                "description": "Récupère le solde d'un compte spécifique en utilisant son numéro de compte.",
+                "operationId": "GET::/compte/{numeroCompte}/solde::App\\Http\\Controllers\\CompteController::soldeByNumero",
+                "parameters": [
+                    {
+                        "name": "numeroCompte",
+                        "in": "path",
+                        "description": "Numéro du compte",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "CMPT-001"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Solde récupéré avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Solde récupéré avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "solde": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 15000.5
+                                                },
+                                                "numero_compte": {
+                                                    "type": "string",
+                                                    "example": "CMPT-001"
+                                                },
+                                                "nom_compte": {
+                                                    "type": "string",
+                                                    "example": "compte principal"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/compte/{numeroCompte}/modifier": {
+            "put": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Modifier un compte existant",
+                "description": "Modifie les informations d'un compte existant (titulaire, code marchand, statut, nom du compte).",
+                "operationId": "PUT::/compte/{numeroCompte}/modifier::App\\Http\\Controllers\\CompteController::modifier",
+                "parameters": [
+                    {
+                        "name": "numeroCompte",
+                        "in": "path",
+                        "description": "Numéro du compte à modifier",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "CMPT-001"
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "properties": {
+                                    "titulaire": {
+                                        "type": "string",
+                                        "example": "Jane Doe"
+                                    },
+                                    "code_marchand": {
+                                        "type": "string",
+                                        "example": "MRC002"
+                                    },
+                                    "statut": {
+                                        "type": "string",
+                                        "enum": [
+                                            "actif",
+                                            "inactif",
+                                            "suspendu"
+                                        ],
+                                        "example": "actif"
+                                    },
+                                    "nom_compte": {
+                                        "type": "string",
+                                        "example": "compte epargne"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Compte modifié avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Compte mis à jour avec succès"
+                                        },
+                                        "data": {
+                                            "$ref": "#/components/schemas/Compte"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Données invalides ou nom de compte déjà utilisé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/compte/{numeroCompte}/switch": {
+            "post": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Changer le compte actif",
+                "description": "Change le compte actif de l'utilisateur. Désactive automatiquement tous les autres comptes et définit le compte sélectionné comme 'compte principal'.",
+                "operationId": "POST::/compte/{numeroCompte}/switch::App\\Http\\Controllers\\CompteController::switch",
+                "parameters": [
+                    {
+                        "name": "numeroCompte",
+                        "in": "path",
+                        "description": "Numéro du compte à activer",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "CMPT-002"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Compte activé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Compte activé avec succès. Il est maintenant défini comme 'compte principal'."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "numero_compte": {
+                                                    "type": "string",
+                                                    "example": "CMPT-002"
+                                                },
+                                                "nom_compte": {
+                                                    "type": "string",
+                                                    "example": "compte principal"
+                                                },
+                                                "statut": {
+                                                    "type": "string",
+                                                    "example": "actif"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Compte déjà actif ou suspendu"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/compte/{numeroCompte}/supprimer": {
+            "delete": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Demander la suppression d'un compte",
+                "description": "Initie le processus de suppression d'un compte selon les règles métier. Peut nécessiter une confirmation OTP.",
+                "operationId": "DELETE::/compte/{numeroCompte}/supprimer::App\\Http\\Controllers\\CompteController::supprimer",
+                "parameters": [
+                    {
+                        "name": "numeroCompte",
+                        "in": "path",
+                        "description": "Numéro du compte à supprimer",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "CMPT-001"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Demande de suppression initiée",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "oneOf": [
+                                        {
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "success"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Votre compte compte epargne est supprimé avec succès."
+                                                },
+                                                "data": {
+                                                    "type": "null"
+                                                }
+                                            },
+                                            "type": "object"
+                                        },
+                                        {
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "example": "success"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "example": "Confirmation OTP requise pour la suppression du compte."
+                                                },
+                                                "data": {
+                                                    "properties": {
+                                                        "requires_otp": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        },
+                                                        "compte_id": {
+                                                            "type": "string",
+                                                            "example": "uuid-compte"
+                                                        },
+                                                        "numero_compte": {
+                                                            "type": "string",
+                                                            "example": "CMPT-001"
+                                                        },
+                                                        "nom_compte": {
+                                                            "type": "string",
+                                                            "example": "compte principal"
+                                                        },
+                                                        "solde": {
+                                                            "type": "number",
+                                                            "format": "float",
+                                                            "example": 0
+                                                        },
+                                                        "otp_sent": {
+                                                            "type": "boolean",
+                                                            "example": true
+                                                        },
+                                                        "expires_in": {
+                                                            "type": "string",
+                                                            "example": "10 minutes"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Solde positif ou règles métier non respectées"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/otp/confirmation": {
+            "post": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Confirmer la suppression d'un compte avec OTP",
+                "description": "Valide le code OTP et procède à la suppression définitive du compte.",
+                "operationId": "POST::/otp/confirmation::App\\Http\\Controllers\\CompteController::confirmationOtp",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "required": [
+                                    "otp_code",
+                                    "compte_id"
+                                ],
+                                "properties": {
+                                    "otp_code": {
+                                        "description": "Code OTP à 6 chiffres",
+                                        "type": "string",
+                                        "example": "123456"
+                                    },
+                                    "compte_id": {
+                                        "description": "ID du compte à supprimer",
+                                        "type": "string",
+                                        "example": "uuid-compte"
+                                    }
+                                },
+                                "type": "object"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Compte supprimé avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Votre compte compte epargne est supprimé avec succès après confirmation OTP."
+                                        },
+                                        "data": {
+                                            "type": "null"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Code OTP invalide ou expiré"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Code ou compte non trouvé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/compte/{numeroCompte}/restaurer": {
+            "post": {
+                "tags": [
+                    "Comptes"
+                ],
+                "summary": "Restaurer un compte supprimé",
+                "description": "Restaure un compte qui a été supprimé (soft delete).",
+                "operationId": "POST::/compte/{numeroCompte}/restaurer::App\\Http\\Controllers\\CompteController::restaurer",
+                "parameters": [
+                    {
+                        "name": "numeroCompte",
+                        "in": "path",
+                        "description": "Numéro du compte à restaurer",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "CMPT-001"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Compte restauré avec succès",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Compte restauré avec succès."
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "numero_compte": {
+                                                    "type": "string",
+                                                    "example": "CMPT-001"
+                                                },
+                                                "nom_compte": {
+                                                    "type": "string",
+                                                    "example": "compte principal"
+                                                },
+                                                "statut": {
+                                                    "type": "string",
+                                                    "example": "inactif"
+                                                },
+                                                "solde": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": 0
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Ce compte n'est pas supprimé"
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    },
+                    "404": {
+                        "description": "Compte non trouvé"
                     }
                 },
                 "security": [
@@ -2743,11 +2920,6 @@
             },
             "Compte": {
                 "properties": {
-                    "id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "example": "uuid-compte"
-                    },
                     "numero_compte": {
                         "type": "string",
                         "example": "CMPT-001"
@@ -2755,6 +2927,10 @@
                     "titulaire": {
                         "type": "string",
                         "example": "John Doe"
+                    },
+                    "nom_compte": {
+                        "type": "string",
+                        "example": "compte principal"
                     },
                     "code_marchand": {
                         "type": "string",
@@ -2770,15 +2946,16 @@
                         ],
                         "example": "actif"
                     },
-                    "utilisateur_id": {
-                        "type": "string",
-                        "format": "uuid",
-                        "example": "uuid-user"
-                    },
                     "solde": {
                         "type": "number",
                         "format": "float",
-                        "example": 15000.5
+                        "example": 0
+                    },
+                    "qr_code": {
+                        "description": "Code QR en base64 généré automatiquement",
+                        "type": "string",
+                        "format": "base64",
+                        "nullable": true
                     },
                     "created_at": {
                         "type": "string",
@@ -2925,7 +3102,7 @@
         },
         {
             "name": "Comptes",
-            "description": "Gestion des comptes bancaires"
+            "description": "Gestion complète des comptes bancaires avec règles métier strictes :\n *     - 1 compte principal créé automatiquement lors de l'inscription (actif)\n *     - Maximum 4 comptes par utilisateur (1 principal + 3 secondaires)\n *     - 1 seul compte actif à la fois (les autres deviennent inactifs automatiquement)\n *     - QR code généré automatiquement pour chaque compte\n *     - Notifications email automatiques lors de la création\n *     - Gestion complète du cycle de vie (création, modification, suppression avec OTP)"
         },
         {
             "name": "Transactions",

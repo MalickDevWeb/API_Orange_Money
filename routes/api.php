@@ -41,12 +41,37 @@ Route::get('/status', function () {
 
 // Routes pour les comptes
 Route::middleware(T::passport->value)->group(function () {
-    Route::get('comptes/me', [\App\Http\Controllers\CompteController::class, 'me']);
-    Route::get('balance', [\App\Http\Controllers\CompteController::class, 'solde']); // Endpoint commun pour le solde
-    Route::post('comptes/activate/{nom_compte}', [\App\Http\Controllers\CompteController::class, 'activate']);
-    Route::apiResource('comptes', \App\Http\Controllers\CompteController::class);
-    Route::post('comptes/{compte}/restore', [\App\Http\Controllers\CompteController::class, 'restore']);
-    Route::delete('comptes/{compte}/force-delete', [\App\Http\Controllers\CompteController::class, 'forceDelete']);
+    // Création de compte
+    Route::post('compte/nouveaucompte', [\App\Http\Controllers\CompteController::class, 'nouveaucompte']);
+
+    // Récupération des comptes
+    Route::get('comptes/mesComptes', [\App\Http\Controllers\CompteController::class, 'mesComptes']);
+    Route::get('comptes/{numeroCompte}', [\App\Http\Controllers\CompteController::class, 'showByNumero']);
+
+    // Soldes
+    Route::get('compte/solde', [\App\Http\Controllers\CompteController::class, 'solde']);
+    Route::get('compte/{numeroCompte}/solde', [\App\Http\Controllers\CompteController::class, 'soldeByNumero']);
+
+    // Modification de compte
+    Route::put('compte/{numeroCompte}/modifier', [\App\Http\Controllers\CompteController::class, 'modifier']);
+
+    // Switch de compte actif
+    Route::post('compte/{numeroCompte}/switch', [\App\Http\Controllers\CompteController::class, 'switch']);
+
+    // Suppression de compte
+    Route::delete('compte/{numeroCompte}/supprimer', [\App\Http\Controllers\CompteController::class, 'supprimer']);
+    Route::post('otp/confirmation', [\App\Http\Controllers\CompteController::class, 'confirmationOtp']);
+    Route::delete('compte/{numeroCompte}/force-delete', [\App\Http\Controllers\CompteController::class, 'forceDelete']);
+
+    // Restauration de compte
+    Route::post('compte/{numeroCompte}/restaurer', [\App\Http\Controllers\CompteController::class, 'restaurer']);
+
+    // // Routes existantes (pour compatibilité)
+    // Route::get('comptes/me', [\App\Http\Controllers\CompteController::class, 'me']);
+    // Route::get('balance', [\App\Http\Controllers\CompteController::class, 'solde']); // Endpoint commun pour le solde
+    // Route::post('comptes/activate/{nom_compte}', [\App\Http\Controllers\CompteController::class, 'activate']);
+    // Route::apiResource('comptes', \App\Http\Controllers\CompteController::class);
+    // Route::post('comptes/{compte}/restore', [\App\Http\Controllers\CompteController::class, 'restore']);
 });
 
 Route::middleware(T::passport->value)->group(function () {

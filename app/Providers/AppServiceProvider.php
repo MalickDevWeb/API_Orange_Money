@@ -13,6 +13,11 @@ use App\Interfaces\Repositories\{
 use App\Interfaces\Services\{
     CompteServiceInterface,
     TransactionServiceInterface,
+    UserRightsServiceInterface,
+    StatisticsServiceInterface,
+    FeeServiceInterface,
+    AuditServiceInterface,
+    EmailNotificationServiceInterface,
 };
 
 use App\Interfaces\Auth\{
@@ -38,7 +43,12 @@ use App\Services\{
     TransactionService,
     AuthService,
     TwilioService,
-    BrevoService
+    BrevoService,
+    UserRightsService,
+    StatisticsService,
+    FeeService,
+    AuditService,
+    EmailNotificationService
 };
 
 class AppServiceProvider extends ServiceProvider
@@ -57,8 +67,12 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(TwilioServiceInterface::class, TwilioService::class);
         $this->app->bind(BrevoServiceInterface::class, BrevoService::class);
         $this->app->bind(EmailServiceInterface::class, BrevoService::class);
+        $this->app->bind(UserRightsServiceInterface::class, UserRightsService::class);
+        $this->app->bind(StatisticsServiceInterface::class, StatisticsService::class);
+        $this->app->bind(FeeServiceInterface::class, FeeService::class);
+        $this->app->bind(AuditServiceInterface::class, AuditService::class);
+        $this->app->bind(EmailNotificationServiceInterface::class, EmailNotificationService::class);
     }
-
     /**
      * Bootstrap any application services.
      */

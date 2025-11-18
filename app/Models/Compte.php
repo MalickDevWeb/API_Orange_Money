@@ -25,6 +25,9 @@ class Compte extends Model
         'code_marchand',
         'statut',
         'utilisateur_id',
+        'client_id',
+        'type_compte',
+        'devise',
         'qr_code',
     ];
 
