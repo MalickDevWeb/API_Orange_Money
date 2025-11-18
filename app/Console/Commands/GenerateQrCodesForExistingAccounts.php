@@ -1,31 +1,85 @@
 <?php
 
-namespace App\Observers;
+namespace App\Console\Commands;
 
 use App\Models\Compte;
+use Illuminate\Console\Command;
 
-class CompteObserver
+class GenerateQrCodesForExistingAccounts extends Command
 {
     /**
-     * Handle the Compte "creating" event.
+     * The name and signature of the console command.
+     *
+     * @var string
      */
-    public function creating(Compte $compte): void
-    {
-        try {
-            // Générer une vraie image PNG et la sauvegarder
-            $pngData = $this->generateQrCodePng($compte->numero_compte);
-            $imageUrl = $this->saveQrCodeFile($compte->numero_compte, $pngData);
-
-            // Stocker l'URL publique accessible depuis les emails
-            $compte->qr_code = $imageUrl;
-        } catch (\Exception $e) {
-            // En cas d'erreur, utiliser le QR code ASCII comme fallback
-            $compte->qr_code = $this->generateAsciiQrCode($compte->numero_compte);
-        }
-    }
+    protected $signature = 'app:generate-qr-codes-for-existing-accounts {--force : Régénérer tous les QR codes même s\'ils existent}';
 
     /**
-     * Génère le contenu SVG du QR code (version compacte)
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Génère les QR codes pour tous les comptes existants qui n\'en ont pas';
+
+    /**
+     * Execute the console command.
+     */
+    public function handle()
+    {
+        $force = $this->option('force');
+
+        if ($force) {
+            $comptes = Compte::all();
+            $this->info('Régénération des QR codes pour tous les comptes...');
+        } else {
+            $comptes = Compte::all(); // Régénérer tous les QR codes avec la nouvelle approche
+            $this->info('Génération des QR codes pour les comptes qui n\'en ont pas...');
+        }
+
+        if ($comptes->isEmpty()) {
+            $this->info('Tous les comptes ont déjà un QR code.');
+            return;
+        }
+
+        $this->info("Nombre de comptes à traiter : {$comptes->count()}");
+
+        $bar = $this->output->createProgressBar($comptes->count());
+        $bar->start();
+
+        $successCount = 0;
+        $errorCount = 0;
+
+        foreach ($comptes as $compte) {
+            try {
+                // Générer une vraie image PNG et la sauvegarder avec URL publique
+                $pngData = $this->generateQrCodePng($compte->numero_compte);
+                $imageUrl = $this->saveQrCodeFile($compte->numero_compte, $pngData);
+                $compte->qr_code = $imageUrl;
+
+                $compte->save();
+                $successCount++;
+            } catch (\Exception $e) {
+                $this->error("Erreur pour le compte {$compte->numero_compte} : {$e->getMessage()}");
+                $errorCount++;
+            }
+
+            $bar->advance();
+        }
+
+        $bar->finish();
+        $this->newLine(2);
+
+        $this->info("✅ QR codes générés avec succès : {$successCount}");
+        if ($errorCount > 0) {
+            $this->error("❌ Erreurs : {$errorCount}");
+        }
+
+        $this->info('Génération des QR codes terminée !');
+    }
+
+
+    /**
+     * Génère un SVG compact qui ressemble à un QR code
      */
     private function generateQrCodeSvg(string $data): string
     {
@@ -33,7 +87,7 @@ class CompteObserver
         $margin = 6;
         $moduleSize = 4; // Modules plus petits
 
-        // Créer une matrice simple qui ressemble à un QR code (15x15)
+        // Créer une matrice compacte qui ressemble à un QR code (15x15)
         $matrix = $this->createCompactQrMatrix($data);
 
         $svg = '<?xml version="1.0" encoding="UTF-8"?>';
@@ -58,6 +112,49 @@ class CompteObserver
         $svg .= '</svg>';
 
         return $svg;
+    }
+
+    /**
+     * Crée une matrice compacte qui ressemble à un QR code (15x15)
+     */
+    private function createCompactQrMatrix(string $data): array
+    {
+        $matrixSize = 15; // Matrice plus petite
+        $matrix = array_fill(0, $matrixSize, array_fill(0, $matrixSize, false));
+
+        // Ajouter les patterns de position simplifiés (coins 3x3)
+        $this->addCompactSvgPositionPattern($matrix, 0, 0);
+        $this->addCompactSvgPositionPattern($matrix, $matrixSize - 3, 0);
+        $this->addCompactSvgPositionPattern($matrix, 0, $matrixSize - 3);
+
+        // Ajouter des modules de données basés sur le numéro de compte
+        $dataHash = md5($data);
+        for ($i = 0; $i < min(strlen($dataHash), 40); $i++) {
+            $x = 4 + ($i % 5);
+            $y = 4 + intval($i / 5);
+            if ($x < $matrixSize - 4 && $y < $matrixSize - 4) {
+                $matrix[$y][$x] = (ord($dataHash[$i]) % 2 === 0);
+            }
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * Ajoute un pattern de position compact (3x3)
+     */
+    private function addCompactSvgPositionPattern(array &$matrix, int $startX, int $startY): void
+    {
+        // Carré 3x3 noir avec centre blanc (pattern compact)
+        for ($y = 0; $y < 3; $y++) {
+            for ($x = 0; $x < 3; $x++) {
+                if ($x === 1 && $y === 1) {
+                    $matrix[$startY + $y][$startX + $x] = false; // Centre blanc
+                } else {
+                    $matrix[$startY + $y][$startX + $x] = true; // Bordure noire
+                }
+            }
+        }
     }
 
     /**
@@ -217,50 +314,7 @@ class CompteObserver
     }
 
     /**
-     * Crée une matrice compacte qui ressemble à un QR code (15x15)
-     */
-    private function createCompactQrMatrix(string $data): array
-    {
-        $matrixSize = 15; // Matrice plus petite
-        $matrix = array_fill(0, $matrixSize, array_fill(0, $matrixSize, false));
-
-        // Ajouter les patterns de position simplifiés (coins 3x3)
-        $this->addCompactSvgPositionPattern($matrix, 0, 0);
-        $this->addCompactSvgPositionPattern($matrix, $matrixSize - 3, 0);
-        $this->addCompactSvgPositionPattern($matrix, 0, $matrixSize - 3);
-
-        // Ajouter des modules de données basés sur le numéro de compte
-        $dataHash = md5($data);
-        for ($i = 0; $i < min(strlen($dataHash), 40); $i++) {
-            $x = 4 + ($i % 5);
-            $y = 4 + intval($i / 5);
-            if ($x < $matrixSize - 4 && $y < $matrixSize - 4) {
-                $matrix[$y][$x] = (ord($dataHash[$i]) % 2 === 0);
-            }
-        }
-
-        return $matrix;
-    }
-
-    /**
-     * Ajoute un pattern de position compact (3x3)
-     */
-    private function addCompactSvgPositionPattern(array &$matrix, int $startX, int $startY): void
-    {
-        // Carré 3x3 noir avec centre blanc (pattern compact)
-        for ($y = 0; $y < 3; $y++) {
-            for ($x = 0; $x < 3; $x++) {
-                if ($x === 1 && $y === 1) {
-                    $matrix[$startY + $y][$startX + $x] = false; // Centre blanc
-                } else {
-                    $matrix[$startY + $y][$startX + $x] = true; // Bordure noire
-                }
-            }
-        }
-    }
-
-    /**
-     * Génère un QR code ASCII simple pour affichage dans les emails (fallback)
+     * Génère un QR code ASCII compact pour affichage dans les emails (fallback)
      */
     private function generateAsciiQrCode(string $data): string
     {

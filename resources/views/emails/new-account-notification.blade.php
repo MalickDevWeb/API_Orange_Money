@@ -146,10 +146,62 @@
                 </div>
             </div>
 
+            @if(isset($account['qr_code']) && !empty($account['qr_code']))
+            <div class="account-details">
+                <div class="detail-row">
+                    <span class="detail-label">Code QR du compte:</span>
+                    <span class="detail-value">
+                        @if(filter_var($account['qr_code'], FILTER_VALIDATE_URL))
+                            <div style="text-align: center; margin: 20px 0;">
+                                <div style="font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 10px;">Code QR de votre compte</div>
+                                <img src="{{ $account['qr_code'] }}" alt="QR Code du compte" style="width: 120px; height: 120px; border: 2px solid #FF6B35; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); display: block; margin: 0 auto;">
+                                <div style="margin-top: 10px; font-size: 12px; color: #6c757d;">
+                                    <em>Scannez ce QR code avec votre application mobile</em>
+                                </div>
+                            </div>
+                        @elseif(strpos($account['qr_code'], '⬜') !== false || strpos($account['qr_code'], '⬛') !== false)
+                            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; border: 1px solid #dee2e6; text-align: center; margin: 20px 0;">
+                                <div style="font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 10px;">Code QR de votre compte</div>
+                                <div style="display: inline-block; background-color: white; padding: 8px; border-radius: 4px; border: 1px solid #e9ecef; font-family: 'Courier New', monospace; font-size: 8px; line-height: 1.1; letter-spacing: -0.5px;">
+                                    <pre style="margin: 0; white-space: pre; color: #212529;">{!! nl2br(e($account['qr_code'])) !!}</pre>
+                                </div>
+                                <div style="margin-top: 10px; font-size: 11px; color: #6c757d;">
+                                    <em>Scannez ce QR code avec votre application mobile</em>
+                                </div>
+                            </div>
+                        @elseif(strpos($account['qr_code'], 'http') === 0)
+                            <div style="text-align: center;">
+                                <img src="{{ $account['qr_code'] }}" alt="QR Code du compte" style="max-width: 150px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                                <div style="margin-top: 10px; font-size: 12px; color: #6c757d;">
+                                    <em>Scannez ce QR code avec votre application mobile</em>
+                                </div>
+                            </div>
+                        @elseif(strpos($account['qr_code'], 'data:image') === 0)
+                            <img src="{{ $account['qr_code'] }}" alt="QR Code du compte" style="max-width: 150px; max-height: 150px; border: 1px solid #ddd; border-radius: 4px;">
+                        @else
+                            <div style="background-color: #f8f9fa; padding: 15px; border-radius: 6px; border: 1px solid #dee2e6; text-align: center;">
+                                <div style="font-size: 14px; font-weight: 600; color: #495057; margin-bottom: 10px;">Code QR généré</div>
+                                <div style="font-family: monospace; font-size: 11px; color: #6c757d; word-break: break-all; line-height: 1.4;">
+                                    {{ $account['qr_code'] }}
+                                </div>
+                                <div style="margin-top: 10px; font-size: 12px; color: #6c757d;">
+                                    <em>Utilisez ce code pour scanner avec votre application mobile</em>
+                                </div>
+                            </div>
+                        @endif
+                    </span>
+                </div>
+            </div>
+            @endif
+
             <div class="info">
                 <strong>Information importante:</strong><br>
                 Votre nouveau compte "{{ $account['nom_compte'] }}" a été créé avec le statut "inactif".
                 Vous pouvez l'activer et commencer à l'utiliser immédiatement via votre application mobile ou l'API.
+                @if(isset($account['qr_code']) && !empty($account['qr_code']))
+                <br><br>
+                <strong>Code QR inclus:</strong> Le code QR de votre compte est affiché ci-dessus. Vous pouvez l'utiliser pour des paiements rapides ou l'importer dans votre application mobile.
+                @endif
             </div>
 
             <p>
@@ -159,7 +211,7 @@
 
             <p>
                 <strong>Service Client Orange Money:</strong><br>
-                📞 77 123 45 67<br>
+                📞 77 171 90 13<br>
                 📧 support@orangemoney.sn
             </p>
         </div>

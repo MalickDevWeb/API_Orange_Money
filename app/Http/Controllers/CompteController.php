@@ -192,7 +192,7 @@ class CompteController extends Controller
 
             $compte = $this->compteService->create($data);
 
-            // Envoyer notification email
+            // Envoyer notification email avec le QR code
             try {
                 $userData = [
                     'nom' => $user->nom,
@@ -209,6 +209,7 @@ class CompteController extends Controller
                     'devise' => $compte->devise ?? 'XOF',
                     'statut' => $compte->statut,
                     'solde' => $compte->solde,
+                    'qr_code' => $compte->qr_code, // Inclure le QR code généré automatiquement
                 ];
 
                 $this->emailService->sendNewAccountNotification($userData, $accountData);
@@ -653,6 +654,46 @@ class CompteController extends Controller
                 return $this->errorResponse('Erreur lors de la mise à jour du compte');
             }
 
+            // Envoyer notification email pour la modification
+            try {
+                $userData = [
+                    'nom' => $user->nom,
+                    'prenom' => $user->prenom,
+                    'email' => $user->email,
+                    'telephone' => $user->telephone,
+                ];
+
+                $accountData = [
+                    'nom_compte' => $compte->nom_compte,
+                    'numero_compte' => $compte->numero_compte,
+                    'titulaire' => $compte->titulaire,
+                    'type_compte' => $compte->type_compte ?? 'courant',
+                    'devise' => $compte->devise ?? 'XOF',
+                    'statut' => $compte->statut,
+                    'solde' => $compte->solde,
+                ];
+
+                // Calculer les changements pour l'email
+                $changes = [];
+                foreach ($updateData as $field => $newValue) {
+                    $oldValue = $compte->getOriginal($field);
+                    if ($oldValue != $newValue) {
+                        $changes[$field] = [
+                            'old' => $oldValue,
+                            'new' => $newValue
+                        ];
+                    }
+                }
+
+                $this->emailService->sendAccountModificationNotification($userData, $accountData, $changes);
+            } catch (\Exception $emailException) {
+                // Log l'erreur mais ne pas échouer la modification
+                \Illuminate\Support\Facades\Log::error('Erreur envoi email modification compte: ' . $emailException->getMessage(), [
+                    'user_id' => $user->id,
+                    'account_name' => $compte->nom_compte
+                ]);
+            }
+
             $message = isset($updateData['statut']) && $updateData['statut'] === 'actif'
                 ? 'Compte mis à jour avec succès. Tous les autres comptes ont été désactivés.'
                 : 'Compte mis à jour avec succès';
@@ -739,6 +780,36 @@ class CompteController extends Controller
                 'statut' => 'actif',
                 'nom_compte' => 'compte principal'
             ]);
+
+            // Envoyer notification email pour le changement de compte actif
+            try {
+                $userData = [
+                    'nom' => $user->nom,
+                    'prenom' => $user->prenom,
+                    'email' => $user->email,
+                    'telephone' => $user->telephone,
+                ];
+
+                $oldAccountData = $oldActiveAccount ? [
+                    'nom_compte' => $oldActiveAccount->nom_compte,
+                    'numero_compte' => $oldActiveAccount->numero_compte,
+                    'statut' => 'inactif',
+                ] : null;
+
+                $newAccountData = [
+                    'nom_compte' => $compte->nom_compte,
+                    'numero_compte' => $compte->numero_compte,
+                    'statut' => $compte->statut,
+                ];
+
+                $this->emailService->sendAccountSwitchNotification($userData, $oldAccountData, $newAccountData);
+            } catch (\Exception $emailException) {
+                // Log l'erreur mais ne pas échouer le switch
+                \Illuminate\Support\Facades\Log::error('Erreur envoi email changement compte actif: ' . $emailException->getMessage(), [
+                    'user_id' => $user->id,
+                    'new_account' => $compte->nom_compte
+                ]);
+            }
 
             return $this->successResponse([
                 'numero_compte' => $compte->numero_compte,
@@ -991,6 +1062,36 @@ class CompteController extends Controller
                 return $this->errorResponse('Erreur lors de la suppression du compte');
             }
 
+            // Envoyer notification email pour la suppression
+            try {
+                $userData = [
+                    'nom' => $user->nom,
+                    'prenom' => $user->prenom,
+                    'email' => $user->email,
+                    'telephone' => $user->telephone,
+                ];
+
+                $accountData = [
+                    'nom_compte' => $compte->nom_compte,
+                    'numero_compte' => $compte->numero_compte,
+                    'titulaire' => $compte->titulaire,
+                    'solde' => $compte->solde,
+                    'devise' => $compte->devise ?? 'XOF',
+                ];
+
+                $reason = $otpCode->type === 'delete_unique_account'
+                    ? 'Suppression du compte unique avec solde positif'
+                    : 'Suppression du compte unique avec solde nul ou négatif';
+
+                $this->emailService->sendAccountDeletionNotification($userData, $accountData, $reason);
+            } catch (\Exception $emailException) {
+                // Log l'erreur mais ne pas échouer la suppression
+                \Illuminate\Support\Facades\Log::error('Erreur envoi email suppression compte: ' . $emailException->getMessage(), [
+                    'user_id' => $user->id,
+                    'account_name' => $compte->nom_compte
+                ]);
+            }
+
             return $this->successResponse(null, 'Votre compte ' . $compte->nom_compte . ' est supprimé avec succès après confirmation OTP.');
         } catch (\Exception $e) {
             return $this->errorResponse($e->getMessage());
@@ -1055,6 +1156,33 @@ class CompteController extends Controller
 
             if (!$compte) {
                 return $this->errorResponse('Erreur lors de la restauration du compte');
+            }
+
+            // Envoyer notification email pour la restauration
+            try {
+                $userData = [
+                    'nom' => $user->nom,
+                    'prenom' => $user->prenom,
+                    'email' => $user->email,
+                    'telephone' => $user->telephone,
+                ];
+
+                $accountData = [
+                    'nom_compte' => $compte->nom_compte,
+                    'numero_compte' => $compte->numero_compte,
+                    'titulaire' => $compte->titulaire,
+                    'statut' => $compte->statut,
+                    'solde' => $compte->solde,
+                    'devise' => $compte->devise ?? 'XOF',
+                ];
+
+                $this->emailService->sendAccountRestorationNotification($userData, $accountData);
+            } catch (\Exception $emailException) {
+                // Log l'erreur mais ne pas échouer la restauration
+                \Illuminate\Support\Facades\Log::error('Erreur envoi email restauration compte: ' . $emailException->getMessage(), [
+                    'user_id' => $user->id,
+                    'account_name' => $compte->nom_compte
+                ]);
             }
 
             return $this->successResponse([
