@@ -14,21 +14,13 @@ class CompteResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        return [
-            'id' => $this->id,
+        return[
             'numero_compte' => $this->numero_compte,
-            'titulaire' => $this->titulaire,
-            'nom_compte' => $this->nom_compte,
-            'statut' => $this->statut,
             'type_compte' => $this->type_compte,
-            'devise' => $this->devise,
             'solde' => $this->solde,
-            'code_marchand' => $this->code_marchand,
-            'qr_code' => $this->qr_code,
-            'utilisateur_id' => $this->utilisateur_id,
             'client_id' => $this->client_id,
-            'created_at' => $this->created_at->toISOString(),
-            'updated_at' => $this->updated_at->toISOString(),
+            'created_at' => $this->created_at,
+            'updated_at' => $this->updated_at,
         ];
     }
 }

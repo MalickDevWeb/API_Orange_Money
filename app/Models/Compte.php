@@ -59,9 +59,4 @@ class Compte extends Model
     {
         return $this->utilisateur?->type;
     }
-
-    public function getRouteKeyName()
-    {
-        return 'numero_compte';
-    }
 }

@@ -3,7 +3,6 @@
 namespace App\Services;
 use App\Interfaces\Services\CompteServiceInterface;
 use App\Interfaces\Repositories\CompteRepositoryInterface;
-use App\Dtos\CompteResponseDto;
 
 use App\Models\Compte;
 
@@ -52,10 +51,5 @@ class CompteService implements CompteServiceInterface {
 
     public function forceDelete(string $id) {
         return $this->repo->forceDelete($id);
-    }
-
-    public function createCompteResponseDto(Compte $compte): CompteResponseDto
-    {
-        return CompteResponseDto::fromCompte($compte);
     }
 }
