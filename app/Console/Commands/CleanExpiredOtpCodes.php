@@ -29,44 +29,89 @@ class CleanExpiredOtpCodes extends Command
         $isDryRun = $this->option('dry-run');
 
         if ($isDryRun) {
-            $this->info('🔍 Mode test : affichage des codes expirés sans suppression');
+            $this->info('🔍 Mode test : affichage des codes expirés et utilisés sans suppression');
         }
 
         // Compter les codes expirés
         $expiredCodesCount = OtpCode::where('expires_at', '<', now())->count();
 
-        if ($expiredCodesCount === 0) {
-            $this->info('✅ Aucun code OTP expiré trouvé.');
+        // Compter les codes utilisés (expirés depuis plus d'1 heure)
+        $usedCodesCount = OtpCode::whereNotNull('used_at')
+            ->where('expires_at', '<', now()->subHour())
+            ->count();
+
+        $totalCodesToClean = $expiredCodesCount + $usedCodesCount;
+
+        if ($totalCodesToClean === 0) {
+            $this->info('✅ Aucun code OTP expiré ou utilisé trouvé.');
             return;
         }
 
         $this->info("📊 {$expiredCodesCount} code(s) OTP expiré(s) trouvé(s).");
+        $this->info("📊 {$usedCodesCount} code(s) OTP utilisé(s) trouvé(s).");
+        $this->info("📊 Total: {$totalCodesToClean} code(s) à nettoyer.");
 
         if ($isDryRun) {
             // Afficher les détails des codes expirés
-            $expiredCodes = OtpCode::where('expires_at', '<', now())
-                ->orderBy('expires_at', 'desc')
-                ->get();
+            if ($expiredCodesCount > 0) {
+                $this->info("\n🔴 Codes OTP expirés:");
+                $expiredCodes = OtpCode::where('expires_at', '<', now())
+                    ->orderBy('expires_at', 'desc')
+                    ->take(10) // Limiter l'affichage
+                    ->get();
 
-            $this->table(
-                ['ID', 'Téléphone', 'Type', 'Expiré le', 'Créé le'],
-                $expiredCodes->map(function ($code) {
-                    return [
-                        $code->id,
-                        $code->telephone,
-                        $code->type,
-                        $code->expires_at->format('Y-m-d H:i:s'),
-                        $code->created_at->format('Y-m-d H:i:s'),
-                    ];
-                })
-            );
+                $this->table(
+                    ['ID', 'Téléphone', 'Type', 'Expiré le', 'Créé le'],
+                    $expiredCodes->map(function ($code) {
+                        return [
+                            $code->id,
+                            $code->telephone,
+                            $code->type,
+                            $code->expires_at->format('Y-m-d H:i:s'),
+                            $code->created_at->format('Y-m-d H:i:s'),
+                        ];
+                    })
+                );
+            }
+
+            // Afficher les détails des codes utilisés
+            if ($usedCodesCount > 0) {
+                $this->info("\n🔵 Codes OTP utilisés (expirés depuis > 1h):");
+                $usedCodes = OtpCode::whereNotNull('used_at')
+                    ->where('expires_at', '<', now()->subHour())
+                    ->orderBy('used_at', 'desc')
+                    ->take(10) // Limiter l'affichage
+                    ->get();
+
+                $this->table(
+                    ['ID', 'Téléphone', 'Type', 'Utilisé le', 'Expiré le'],
+                    $usedCodes->map(function ($code) {
+                        return [
+                            $code->id,
+                            $code->telephone,
+                            $code->type,
+                            $code->used_at->format('Y-m-d H:i:s'),
+                            $code->expires_at->format('Y-m-d H:i:s'),
+                        ];
+                    })
+                );
+            }
 
             $this->warn("⚠️  Ces codes seraient supprimés en mode normal.");
         } else {
             // Supprimer réellement les codes expirés
-            $deletedCount = OtpCode::where('expires_at', '<', now())->delete();
+            $expiredDeleted = OtpCode::where('expires_at', '<', now())->delete();
 
-            $this->info("🗑️  {$deletedCount} code(s) OTP expiré(s) supprimé(s) avec succès.");
+            // Supprimer les codes utilisés (expirés depuis plus d'1 heure)
+            $usedDeleted = OtpCode::whereNotNull('used_at')
+                ->where('expires_at', '<', now()->subHour())
+                ->delete();
+
+            $totalDeleted = $expiredDeleted + $usedDeleted;
+
+            $this->info("🗑️  {$expiredDeleted} code(s) OTP expiré(s) supprimé(s).");
+            $this->info("🗑️  {$usedDeleted} code(s) OTP utilisé(s) supprimé(s).");
+            $this->info("🗑️  Total: {$totalDeleted} code(s) supprimé(s).");
             $this->info('✅ Nettoyage terminé.');
         }
     }

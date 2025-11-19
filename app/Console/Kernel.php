@@ -12,9 +12,15 @@ class Kernel extends ConsoleKernel
      */
     protected function schedule(Schedule $schedule): void
     {
-        // Nettoyer les codes OTP expirés toutes les 30 minutes
-        $schedule->command('otp:clean-expired')
-                ->everyThirtyMinutes()
+        // Nettoyer les codes OTP expirés et utilisés toutes les 5 minutes
+        $schedule->job(new \App\Jobs\CleanExpiredOtpCodes())
+                ->everyFiveMinutes()
+                ->withoutOverlapping()
+                ->runInBackground();
+
+        // Nettoyer les commerçants orphelins (sans code marchand) tous les jours à 2h du matin
+        $schedule->job(new \App\Jobs\CleanOrphanedMerchants())
+                ->dailyAt('02:00')
                 ->withoutOverlapping()
                 ->runInBackground();
     }

@@ -40,6 +40,7 @@ class User extends Authenticatable
         'telephone',
         'email',
         'type',
+        'code_marchand',
         'statut',
         'password',
         'pin',

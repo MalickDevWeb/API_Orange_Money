@@ -17,6 +17,7 @@ use App\Interfaces\Services\{
     StatisticsServiceInterface,
     FeeServiceInterface,
     AuditServiceInterface,
+    EmailNotificationServiceInterface,
 };
 
 use App\Interfaces\Auth\{
@@ -46,7 +47,8 @@ use App\Services\{
     UserRightsService,
     StatisticsService,
     FeeService,
-    AuditService
+    AuditService,
+    EmailNotificationService
 };
 
 class AppServiceProvider extends ServiceProvider
@@ -69,6 +71,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(StatisticsServiceInterface::class, StatisticsService::class);
         $this->app->bind(FeeServiceInterface::class, FeeService::class);
         $this->app->bind(AuditServiceInterface::class, AuditService::class);
+        $this->app->bind(EmailNotificationServiceInterface::class, EmailNotificationService::class);
     }
 
     /**
