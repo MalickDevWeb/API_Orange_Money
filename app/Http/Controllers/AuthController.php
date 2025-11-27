@@ -299,7 +299,7 @@ class AuthController extends Controller
             return $this->respondWithToken(
                 $result['token'],
                 $message,
-                new UserResource($result['user']),
+                $result['user'],
                 $extra
             );
         } catch (\Exception $e) {

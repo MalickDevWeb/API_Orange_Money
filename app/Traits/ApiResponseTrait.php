@@ -74,10 +74,15 @@ trait ApiResponseTrait
     public function respondWithToken($token, string $message = 'Authentification réussie', $user = null, array $extra = []): JsonResponse
     {
         try {
+            // Gérer les deux cas : objet token ou string token
+            $accessToken = is_object($token) && method_exists($token, 'plainTextToken')
+                ? $token->plainTextToken
+                : $token;
+
             $response = [
                 'status' => 'success',
                 'message' => $message,
-                'access_token' => $token->plainTextToken,
+                'access_token' => $accessToken,
                 'token_type' => 'Bearer',
             ];
 

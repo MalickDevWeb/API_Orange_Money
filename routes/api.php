@@ -32,6 +32,7 @@ Route::middleware(T::passport->value)->group(function () {
     Route::get('logout/otp', [AuthController::class, 'sendLogoutOtp'])->name('sendOtp');
     Route::post('logout', [AuthController::class, 'verifyLogoutOtp'])->name('verifyOtp');
     Route::get('user', [AuthController::class, 'user']);
+    Route::get('user/details', [UserController::class, 'detailsUser']);
     Route::put('user', [UserController::class, 'updateProfile']);
 });
 

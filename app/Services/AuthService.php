@@ -8,6 +8,7 @@ use App\Interfaces\Auth\AuthInterfaceRepository;
 use App\Dtos\UserResponseDto;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
 use App\Events\UserLoggedIn;
 use App\Events\UserRegistered;
 use App\Enums\ResponseMessage;
@@ -156,12 +157,15 @@ class AuthService implements AuthInterfaceService
             // Générer le token
             $token = $otpCode->user->createToken('API Token');
 
+            // CORRECTION: Fix Sanctum token format for PostgreSQL
+            $fixedToken = $this->fixSanctumToken($token);
+
             // Fire the event after successful login
             event(new UserLoggedIn($otpCode->user));
 
             $response = [
                 'user' => $otpCode->user,
-                'token' => $token
+                'token' => $fixedToken
             ];
 
             return $response;
@@ -171,6 +175,26 @@ class AuthService implements AuthInterfaceService
                 'data' => $data,
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Fix Sanctum token format for PostgreSQL compatibility
+     * Converts "|value" format to "id|value" format
+     */
+    private function fixSanctumToken($tokenResult)
+    {
+        try {
+            // Get the token ID from database
+            $dbToken = DB::table('personal_access_tokens')->latest('id')->first();
+            if ($dbToken && $tokenResult) {
+                $tokenValue = explode('|', $tokenResult->plainTextToken)[1] ?? '';
+                return $dbToken->id . '|' . $tokenValue;
+            }
+            return $tokenResult->plainTextToken ?? '';
+        } catch (\Exception $e) {
+            Log::error('Error fixing Sanctum token: ' . $e->getMessage());
+            return $tokenResult->plainTextToken ?? '';
         }
     }
 
@@ -285,9 +309,9 @@ class AuthService implements AuthInterfaceService
          }
      }
 
-     public function createUserResponseDto(User $user): UserResponseDto
-     {
-         return UserResponseDto::fromUser($user);
-     }
+    //  public function createUserResponseDto(User $user): UserResponseDto
+    //  {
+    //      return UserResponseDto::fromUser($user);
+    //  }
 
 }

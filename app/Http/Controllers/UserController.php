@@ -87,4 +87,66 @@ class UserController extends Controller
         return $this->successResponse($user, ResponseMessage::PROFILE_UPDATED->value);
     }
 
+    /**
+     * @OA\Get(
+     *     path="/user/details",
+     *     operationId="getUserDetails",
+     *     tags={"Utilisateurs"},
+     *     summary="Récupérer les détails de l'utilisateur avec comptes et transactions",
+     *     security={{"bearerAuth":{}}},
+     *     @OA\Response(
+     *         response=200,
+     *         description="Détails utilisateur récupérés",
+     *         @OA\JsonContent(
+     *             @OA\Property(property="status", type="string", example="success"),
+     *             @OA\Property(property="message", type="string", example="Détails utilisateur récupérés avec succès"),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="nom", type="string", example="Dupont"),
+     *                 @OA\Property(property="prenom", type="string", example="Jean"),
+     *                 @OA\Property(property="numero", type="string", example="771234567"),
+     *                 @OA\Property(property="comptes", type="array", @OA\Items(ref="#/components/schemas/Compte")),
+     *                 @OA\Property(property="compte_actif", ref="#/components/schemas/Compte"),
+     *                 @OA\Property(property="solde_compte_actif", type="number", format="float", example="1500.50"),
+     *                 @OA\Property(property="transactions_compte_actif", type="array", @OA\Items(ref="#/components/schemas/Transaction"))
+     *             )
+     *         )
+     *     ),
+     *     @OA\Response(response=401, description="Non autorisé")
+     * )
+     */
+    public function detailsUser()
+    {
+        /** @var \App\Models\User $user */
+        $user = auth('api')->user();
+
+        // Charger les comptes de l'utilisateur
+        $comptes = $user->comptes()->get();
+
+        // Trouver le compte actif (statut = 'actif')
+        $compteActif = $comptes->firstWhere('statut', 'actif');
+
+        $transactionsCompteActif = collect();
+
+        if ($compteActif) {
+            // Récupérer les transactions où le compte actif est émetteur ou récepteur
+            $transactionsEmises = $compteActif->transactionsEmises()->with(['compteEmetteur', 'compteRecepteur'])->get();
+            $transactionsRecues = $compteActif->transactionsRecues()->with(['compteEmetteur', 'compteRecepteur'])->get();
+
+            // Fusionner et trier par date
+            $transactionsCompteActif = $transactionsEmises->merge($transactionsRecues)->sortByDesc('created_at');
+        }
+
+        $data = [
+            'nom' => $user->nom,
+            'prenom' => $user->prenom,
+            'numero' => $user->telephone,
+            'comptes' => $comptes,
+            'compte_actif' => $compteActif,
+            'solde_compte_actif' => $compteActif ? $compteActif->solde : null,
+            'transactions_compte_actif' => $transactionsCompteActif,
+        ];
+
+        return $this->successResponse($data, 'Détails utilisateur récupérés avec succès');
+    }
+
 }
