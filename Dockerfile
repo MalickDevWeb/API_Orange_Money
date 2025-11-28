@@ -44,14 +44,11 @@ RUN mkdir -p storage/framework/{cache,data,sessions,testing,views} \
 COPY docker-entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Définir le point d'entrée
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
-
 # Passer à l'utilisateur non-root
 USER laravel
 
-# Exposer le port (Render utilise la variable PORT)
-EXPOSE $PORT
+# Exposer le port 8000
+EXPOSE 8000
 
 # Commande par défaut
-CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=$PORT"]
+CMD ["php", "artisan", "serve", "--host=0.0.0.0", "--port=8000"]
