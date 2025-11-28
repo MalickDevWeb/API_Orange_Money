@@ -2785,6 +2785,82 @@
                     }
                 ]
             }
+        },
+        "/user/details": {
+            "get": {
+                "tags": [
+                    "Utilisateurs"
+                ],
+                "summary": "Récupérer les détails de l'utilisateur avec comptes et transactions",
+                "operationId": "getUserDetails",
+                "responses": {
+                    "200": {
+                        "description": "Détails utilisateur récupérés",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "status": {
+                                            "type": "string",
+                                            "example": "success"
+                                        },
+                                        "message": {
+                                            "type": "string",
+                                            "example": "Détails utilisateur récupérés avec succès"
+                                        },
+                                        "data": {
+                                            "properties": {
+                                                "nom": {
+                                                    "type": "string",
+                                                    "example": "Dupont"
+                                                },
+                                                "prenom": {
+                                                    "type": "string",
+                                                    "example": "Jean"
+                                                },
+                                                "numero": {
+                                                    "type": "string",
+                                                    "example": "771234567"
+                                                },
+                                                "comptes": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/Compte"
+                                                    }
+                                                },
+                                                "compte_actif": {
+                                                    "$ref": "#/components/schemas/Compte"
+                                                },
+                                                "solde_compte_actif": {
+                                                    "type": "number",
+                                                    "format": "float",
+                                                    "example": "1500.50"
+                                                },
+                                                "transactions_compte_actif": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/Transaction"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Non autorisé"
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
         }
     },
     "components": {
