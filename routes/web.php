@@ -19,6 +19,7 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+
 Route::get('/send-mail', [MailController::class, 'send']);
 Route::get('/create-campaign', [CampaignController::class, 'create']);
 Route::post('/send-campaign', [CampaignController::class, 'sendNow']);
