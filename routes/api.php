@@ -33,6 +33,7 @@ Route::middleware(T::passport->value)->group(function () {
     Route::post('logout', [AuthController::class, 'verifyLogoutOtp'])->name('verifyOtp');
     Route::get('user', [AuthController::class, 'user']);
     Route::get('user/details', [UserController::class, 'detailsUser']);
+    Route::get('user/sync', [UserController::class, 'syncUserData']);
     Route::put('user', [UserController::class, 'updateProfile']);
 });
 

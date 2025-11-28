@@ -1225,9 +1225,9 @@ class AdminController extends Controller
                 return $this->errorResponse('Le nom "compte principal" est réservé au premier compte créé automatiquement lors de l\'inscription.', 400);
             }
 
-            // Vérifier que le nom du compte est unique pour cet utilisateur
+            // Vérifier que le nom du compte est unique pour cet utilisateur (insensible à la casse)
             $existingAccountWithName = \App\Models\Compte::where('utilisateur_id', $user->id)
-                                            ->where('nom_compte', $data['nom_compte'])
+                                            ->whereRaw('LOWER(nom_compte) = LOWER(?)', [$data['nom_compte']])
                                             ->first();
             if ($existingAccountWithName) {
                 return $this->errorResponse('Un compte avec ce nom existe déjà pour cet utilisateur.', 400);

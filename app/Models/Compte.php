@@ -50,8 +50,15 @@ class Compte extends Model
 
     public function getSoldeAttribute(): float
     {
-        $received = $this->transactionsRecues()->where('statut', TransactionStatus::REUSSIE)->sum('montant');
-        $sent = $this->transactionsEmises()->where('statut', TransactionStatus::REUSSIE)->sum('montant');
+        // OPTIMISATION: Utiliser les index pour des requêtes plus rapides
+        $received = $this->transactionsRecues()
+            ->where('statut', TransactionStatus::REUSSIE->value)
+            ->sum('montant');
+
+        $sent = $this->transactionsEmises()
+            ->where('statut', TransactionStatus::REUSSIE->value)
+            ->sum('montant');
+
         return $received - $sent;
     }
 

@@ -54,8 +54,8 @@ class Transaction extends Model
 
     /**
      * Retourne le montant avec le signe approprié selon l'utilisateur
-     * +montant pour les crédits (réceptions)
-     * -montant pour les débits (envois, retraits, paiements)
+     * +montant pour les transactions entrantes (réceptions)
+     * -montant pour les transactions sortantes (envois, retraits, paiements)
      */
     public function getMontantSigneAttribute(): string
     {
@@ -73,48 +73,13 @@ class Transaction extends Model
         $isRecepteur = $this->compte_recepteur_id && $this->compteRecepteur &&
                        $this->compteRecepteur->utilisateur_id === $user->id;
 
-        // Logique des signes selon le type de transaction
-        switch ($this->type) {
-            case TransactionType::DEPOT->value:
-                // Pour les dépôts : + si récepteur, - si émetteur (fournisseur)
-                if ($isRecepteur) {
-                    return '+' . number_format($this->montant, 2, '.', '');
-                } elseif ($isEmetteur) {
-                    return '-' . number_format($this->montant, 2, '.', '');
-                }
-                break;
-
-            case TransactionType::RETRAIT->value:
-                // Pour les retraits : toujours - pour l'émetteur
-                if ($isEmetteur) {
-                    return '-' . number_format($this->montant, 2, '.', '');
-                }
-                break;
-
-            case TransactionType::TRANSFERT->value:
-                // Pour les transferts : - si émetteur, + si récepteur
-                if ($isEmetteur) {
-                    return '-' . number_format($this->montant, 2, '.', '');
-                } elseif ($isRecepteur) {
-                    return '+' . number_format($this->montant, 2, '.', '');
-                }
-                break;
-
-            case TransactionType::PAIEMENT->value:
-                // Pour les paiements : - si émetteur (client), + si récepteur (marchand)
-                if ($isEmetteur) {
-                    return '-' . number_format($this->montant, 2, '.', '');
-                } elseif ($isRecepteur) {
-                    return '+' . number_format($this->montant, 2, '.', '');
-                }
-                break;
-
-            case TransactionType::ACHAT_VIRTUEL->value:
-                // Pour les achats virtuels : + pour l'admin récepteur
-                if ($isRecepteur) {
-                    return '+' . number_format($this->montant, 2, '.', '');
-                }
-                break;
+        // Logique simplifiée : - pour les transactions sortantes, + pour les transactions entrantes
+        if ($isEmetteur) {
+            // L'utilisateur est émetteur = transaction sortante = -
+            return '-' . number_format($this->montant, 2, '.', '');
+        } elseif ($isRecepteur) {
+            // L'utilisateur est récepteur = transaction entrante = +
+            return '+' . number_format($this->montant, 2, '.', '');
         }
 
         // Par défaut, retourner le montant brut pour les admins ou autres cas

@@ -220,11 +220,34 @@ class TransactionController extends Controller
 
             $transactions = $this->getPaginatedSorted($query, $request);
 
-            // Formater les données de sortie
+            // Utiliser TransactionResource pour formater les données
             $formattedData = $transactions->getCollection()->map(function ($transaction) {
+                $utilisateurEmetteurData = null;
+                $utilisateurRecepteurData = null;
+
+                if ($transaction->compteEmetteur && $transaction->compteEmetteur->utilisateur) {
+                    $utilisateurEmetteurData = [
+                        'nom' => $transaction->compteEmetteur->utilisateur->nom,
+                        'prenom' => $transaction->compteEmetteur->utilisateur->prenom,
+                        'telephone' => $transaction->compteEmetteur->utilisateur->telephone,
+                        'type' => $transaction->compteEmetteur->utilisateur->type,
+                    ];
+                }
+
+                if ($transaction->compteRecepteur && $transaction->compteRecepteur->utilisateur) {
+                    $utilisateurRecepteurData = [
+                        'nom' => $transaction->compteRecepteur->utilisateur->nom,
+                        'prenom' => $transaction->compteRecepteur->utilisateur->prenom,
+                        'telephone' => $transaction->compteRecepteur->utilisateur->telephone,
+                        'type' => $transaction->compteRecepteur->utilisateur->type,
+                    ];
+                }
+
                 return [
+                    'id' => $transaction->id,
                     'type' => $transaction->type,
-                    'montant' => $transaction->montant_signe,
+                    'montant' => $transaction->montant,
+                    'montant_signe' => $transaction->montant_signe,
                     'frais' => $transaction->frais ?? 0,
                     'reference' => $transaction->reference,
                     'statut' => $transaction->statut,
@@ -232,6 +255,8 @@ class TransactionController extends Controller
                     'date_transaction' => $transaction->date_transaction,
                     'numero_envoyer' => $transaction->compte_emetteur_id ? $transaction->compteEmetteur->utilisateur->telephone : null,
                     'numero_recepteur' => $transaction->compte_recepteur_id ? $transaction->compteRecepteur->utilisateur->telephone : null,
+                    'utilisateur_emetteur_data' => $utilisateurEmetteurData,
+                    'utilisateur_recepteur_data' => $utilisateurRecepteurData,
                 ];
             });
 

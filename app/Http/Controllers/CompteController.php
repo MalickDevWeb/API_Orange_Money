@@ -9,7 +9,7 @@ use App\Interfaces\Services\EmailNotificationServiceInterface;
 use App\Http\Requests\StoreCompteRequest;
 use App\Http\Requests\NouveauCompteRequest;
 use App\Http\Requests\ModifierCompteRequest;
-use App\Http\Requests\ConfirmationOtpRequest;
+use App\Http\Requests\ConfirmDeleteCompteRequest;
 use App\Traits\ApiResponseTrait;
 use App\Traits\PaginatedSortedTrait;
 use Illuminate\Http\Request;
@@ -56,8 +56,7 @@ use Illuminate\Http\Request;
  *     path="/comptes/confirm-delete"
  * )
  *
- * @property-read \App\Models\User $user
- * @method \Illuminate\Database\Eloquent\Relations\HasMany comptes()
+ * @mixin \App\Models\User
  */
 class CompteController extends Controller
 {
@@ -143,6 +142,7 @@ class CompteController extends Controller
     public function nouveaucompte(Request $request)
     {
         try {
+            /** @var \App\Models\User $user */
             $user = auth()->user();
 
             // Validation
@@ -170,9 +170,9 @@ class CompteController extends Controller
                 return $this->errorResponse('Vous ne pouvez pas avoir plus de 4 comptes.', 400);
             }
 
-            // Vérifier que le nom du compte est unique pour cet utilisateur
+            // Vérifier que le nom du compte est unique pour cet utilisateur (insensible à la casse)
             $existingAccountWithName = Compte::where('utilisateur_id', $user->id)
-                                            ->where('nom_compte', $nomCompte)
+                                            ->whereRaw('LOWER(nom_compte) = LOWER(?)', [$nomCompte])
                                             ->first();
             if ($existingAccountWithName) {
                 return $this->errorResponse('Un compte avec ce nom existe déjà.', 400);
@@ -315,6 +315,7 @@ class CompteController extends Controller
     public function mesComptes(Request $request)
     {
         try {
+            /** @var \App\Models\User $user */
             $user = auth()->user();
 
             // Check if supplier is approved
@@ -629,7 +630,7 @@ class CompteController extends Controller
                 }
 
                 $existingAccountWithName = Compte::where('utilisateur_id', $user->id)
-                                                ->where('nom_compte', $updateData['nom_compte'])
+                                                ->whereRaw('LOWER(nom_compte) = LOWER(?)', [$updateData['nom_compte']])
                                                 ->where('id', '!=', $compte->id)
                                                 ->first();
                 if ($existingAccountWithName) {
@@ -870,6 +871,7 @@ class CompteController extends Controller
     public function supprimer(string $numeroCompte)
     {
         try {
+            /** @var \App\Models\User $user */
             $user = auth()->user();
 
             $compte = Compte::where('numero_compte', $numeroCompte)
@@ -1023,7 +1025,7 @@ class CompteController extends Controller
      *     @OA\Response(response=404, description="Code ou compte non trouvé")
      * )
      */
-    public function confirmationOtp(ConfirmationOtpRequest $request)
+    public function confirmationOtp(ConfirmDeleteCompteRequest $request)
     {
         try {
             $user = auth()->user();
@@ -1223,9 +1225,9 @@ class CompteController extends Controller
                 return $this->errorResponse('Le nom "compte principal" est réservé au premier compte créé automatiquement lors de l\'inscription.', 400);
             }
 
-            // Vérifier que le nom du compte est unique pour cet utilisateur
+            // Vérifier que le nom du compte est unique pour cet utilisateur (insensible à la casse)
             $existingAccountWithName = Compte::where('utilisateur_id', $user->id)
-                                            ->where('nom_compte', $data['nom_compte'])
+                                            ->whereRaw('LOWER(nom_compte) = LOWER(?)', [$data['nom_compte']])
                                             ->first();
             if ($existingAccountWithName) {
                 return $this->errorResponse('Un compte avec ce nom existe déjà.', 400);
