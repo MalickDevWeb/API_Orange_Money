@@ -14,8 +14,8 @@ use Illuminate\Routing\Controller as BaseController;
  * )
  *
  * @OA\Server(
- *     url="http://localhost:8000/api",
- *     description="Serveur de développement"
+ *     url="https://api-orange-money-pmt.onrender.com/api",
+ *     description="Serveur de production"
  * )
  *
  * @OA\SecurityScheme(

@@ -84,7 +84,7 @@ class AuthController extends Controller
      *                 @OA\Property(property="pin", type="string", example="1234")
      *             ),
      *             @OA\Property(property="message", type="string", example="Utilisateur enregistré avec succès"),
-     *             @OA\Property(property="redirect_url", type="string", example="http://localhost:8000/api/login?telephone=705334611")
+     *             @OA\Property(property="redirect_url", type="string", example="https://api-orange-money-pmt.onrender.com/api/login?telephone=705334611")
      *         )
      *     ),
      *     @OA\Response(response=422, description="Données invalides")
