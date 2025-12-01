@@ -36,7 +36,7 @@ yarn-error.log*
 !/bootstrap/cache/.gitkeep
 
 # Composer
-composer.lock
+# composer.lock  # Keep for reproducible builds
 
 # Tests
 /tests
