@@ -28,7 +28,6 @@ class Compte extends Model
         'client_id',
         'type_compte',
         'devise',
-        'qr_code',
     ];
 
 

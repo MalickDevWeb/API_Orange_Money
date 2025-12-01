@@ -64,7 +64,104 @@ class ComprehensiveTestSeeder extends Seeder
                     'statut' => 'actif',
                 ])
             );
+<<<<<<< HEAD
             $this->command->info("Utilisateur créé: {$user->nom} {$user->prenom} ({$user->telephone}) - {$user->type}");
+=======
+            $this->command->info("Fournisseur créé: {$fournisseur->nom} {$fournisseur->prenom} ({$fournisseur->telephone})");
+        }
+
+        // === UTILISATEURS EN ATTENTE ===
+        $this->command->info('Création des utilisateurs en attente...');
+
+        $pendingUsers = [
+            [
+                'nom' => 'Nouvel',
+                'prenom' => 'Client',
+                'telephone' => '770000040',
+                'email' => 'nouvel.client@test.com',
+                'type' => 'client',
+            ],
+            [
+                'nom' => 'Nouveau',
+                'prenom' => 'Commercant',
+                'telephone' => '770000041',
+                'email' => 'nouveau.commercant@test.com',
+                'type' => 'commercant',
+            ],
+        ];
+
+        foreach ($pendingUsers as $pendingData) {
+            $pending = User::updateOrCreate(
+                ['telephone' => $pendingData['telephone']],
+                array_merge($pendingData, [
+                    'password' => Hash::make($password),
+                    'statut' => 'en_attente',
+                ])
+            );
+            $this->command->info("Utilisateur en attente créé: {$pending->nom} {$pending->prenom} ({$pending->telephone}) - {$pending->type}");
+        }
+
+        // === TRANSACTIONS DE TEST ===
+        $this->command->info('Création des transactions de test...');
+
+        // Récupérer quelques comptes pour créer des transactions
+        $client1 = User::where('telephone', '770000001')->first();
+        $client2 = User::where('telephone', '770000002')->first();
+        $commercant1 = User::where('telephone', '770000004')->first();
+
+        if ($client1 && $client2 && $commercant1) {
+            $compteClient1 = $client1->comptes->first();
+            $compteClient2 = $client2->comptes->first();
+            $compteCommercant1 = $commercant1->comptes->first();
+
+            if ($compteClient1 && $compteClient2 && $compteCommercant1) {
+                // Transfert entre clients
+                Transaction::create([
+                    'type' => 'transfert',
+                    'montant' => 500000,
+                    'reference' => 'TRF-' . strtoupper(Str::random(8)),
+                    'statut' => 'reussie',
+                    'compte_emetteur_id' => $compteClient1->id,
+                    'compte_recepteur_id' => $compteClient2->id,
+                    'date_transaction' => now(),
+                ]);
+
+                // Paiement à un commerçant
+                Transaction::create([
+                    'type' => 'paiement',
+                    'montant' => 500000,
+                    'reference' => 'PAY-' . strtoupper(Str::random(8)),
+                    'statut' => 'reussie',
+                    'compte_emetteur_id' => $compteClient1->id,
+                    'compte_recepteur_id' => $compteCommercant1->id,
+                    'date_transaction' => now(),
+                ]);
+
+                // Dépôt
+                Transaction::create([
+                    'type' => 'depot',
+                    'montant' => 500000,
+                    'reference' => 'DEP-' . strtoupper(Str::random(8)),
+                    'statut' => 'reussie',
+                    'compte_emetteur_id' => null,
+                    'compte_recepteur_id' => $compteClient1->id,
+                    'date_transaction' => now(),
+                ]);
+
+                // Retrait
+                Transaction::create([
+                    'type' => 'retrait',
+                    'montant' => 500000,
+                    'reference' => 'RET-' . strtoupper(Str::random(8)),
+                    'statut' => 'reussie',
+                    'compte_emetteur_id' => $compteClient1->id,
+                    'compte_recepteur_id' => null,
+                    'date_transaction' => now(),
+                ]);
+
+                $this->command->info('Transactions de test créées avec succès');
+            }
+>>>>>>> 71ebfc9 (prete a deployer)
         }
 
         // === RÉSUMÉ ===

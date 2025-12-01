@@ -12,7 +12,7 @@ class TransactionSeeder extends Seeder
     public function run(): void
     {
         // Récupère les comptes
-    
+
         $adminCompte = Compte::where('numero_compte', 'CMPT-ADMIN-001')->first();
         $clientCompte = Compte::where('numero_compte', 'CMPT-CLIENT-001')->first();
         $commercantCompte = Compte::where('numero_compte', 'CMPT-MRC-001')->first();
@@ -22,7 +22,7 @@ class TransactionSeeder extends Seeder
             Transaction::factory()->create([
                 'id' => (string) Str::uuid(),
                 'type' => 'depot',
-                'montant' => 100000, // par ex.
+                'montant' => 500000, // par ex.
                 'reference' => strtoupper(Str::random(12)),
                 'statut' => 'reussie',
                 'compte_emetteur_id' => $adminCompte->id,
@@ -37,7 +37,7 @@ class TransactionSeeder extends Seeder
             Transaction::factory()->create([
                 'id' => (string) Str::uuid(),
                 'type' => 'depot',
-                'montant' => 50000,
+                'montant' => 500000,
                 'reference' => strtoupper(Str::random(12)),
                 'statut' => 'reussie',
                 'compte_emetteur_id' => $commercantCompte->id,
@@ -52,7 +52,7 @@ class TransactionSeeder extends Seeder
             Transaction::factory()->create([
                 'id' => (string) Str::uuid(),
                 'type' => 'paiement',
-                'montant' => 20000,
+                'montant' => 500000,
                 'reference' => strtoupper(Str::random(12)),
                 'statut' => 'reussie',
                 'compte_emetteur_id' => $clientCompte->id,

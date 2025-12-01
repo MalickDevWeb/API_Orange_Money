@@ -71,7 +71,6 @@ class UserObserver
                 'devise' => $compte->devise,
                 'statut' => $compte->statut,
                 'solde' => $compte->solde,
-                'qr_code' => $compte->qr_code, // Inclure le QR code généré automatiquement
                 'code_marchand' => $compte->code_marchand,
             ];
 

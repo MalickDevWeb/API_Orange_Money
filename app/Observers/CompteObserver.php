@@ -11,17 +11,7 @@ class CompteObserver
      */
     public function creating(Compte $compte): void
     {
-        try {
-            // Générer une vraie image PNG et la sauvegarder
-            $pngData = $this->generateQrCodePng($compte->numero_compte);
-            $imageUrl = $this->saveQrCodeFile($compte->numero_compte, $pngData);
-
-            // Stocker l'URL publique accessible depuis les emails
-            $compte->qr_code = $imageUrl;
-        } catch (\Exception $e) {
-            // En cas d'erreur, utiliser le QR code ASCII comme fallback
-            $compte->qr_code = $this->generateAsciiQrCode($compte->numero_compte);
-        }
+        // QR code functionality removed as column was dropped
     }
 
     /**

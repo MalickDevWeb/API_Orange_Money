@@ -1,0 +1,44 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->index('nom');
+            $table->index('prenom');
+            $table->index('type');
+        });
+
+        Schema::table('comptes', function (Blueprint $table) {
+            $table->index('titulaire');
+            $table->index('code_marchand');
+            $table->index('statut');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::table('users', function (Blueprint $table) {
+            $table->dropIndex(['nom']);
+            $table->dropIndex(['prenom']);
+            $table->dropIndex(['type']);
+        });
+
+        Schema::table('comptes', function (Blueprint $table) {
+            $table->dropIndex(['titulaire']);
+            $table->dropIndex(['code_marchand']);
+            $table->dropIndex(['statut']);
+        });
+    }
+};

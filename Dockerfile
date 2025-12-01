@@ -1,4 +1,21 @@
-# Étape 1: Build des dépendances PHP
+# Étape 1: Build des assets frontend
+FROM node:18-alpine AS frontend-build
+
+WORKDIR /app
+
+# Copier les fichiers package
+COPY package*.json ./
+
+# Installer les dépendances Node.js
+RUN npm ci
+
+# Copier les fichiers source
+COPY . .
+
+# Build des assets
+RUN npm run build
+
+# Étape 2: Build des dépendances PHP
 FROM composer:2.6 AS composer-build
 
 WORKDIR /app
@@ -14,12 +31,12 @@ COPY composer.json composer.lock ./
 # Installer les dépendances
 RUN composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist --no-scripts
 
-# Étape 2: Image finale pour l'application
-FROM php:8.3-fpm-alpine
+# Étape 3: Image finale pour l'application
+FROM php:8.3-cli-alpine
 
-# Installer les extensions PHP nécessaires et bash pour Render
-RUN apk add --no-cache postgresql-dev bash \
-  && apk add --no-cache bash zlib-dev gcc musl-dev make autoconf g++ \
+# Installer les extensions PHP nécessaires et outils
+RUN apk add --no-cache postgresql-dev bash postgresql-client \
+  && apk add --no-cache zlib-dev gcc musl-dev make autoconf g++ \
   && pecl install mongodb \
   && docker-php-ext-enable mongodb \
   && docker-php-ext-install pdo pdo_pgsql
@@ -33,10 +50,13 @@ WORKDIR /var/www/html
 # Copier les dépendances installées depuis l'étape de build
 COPY --from=composer-build /app/vendor ./vendor
 
+# Copier les assets buildés
+COPY --from=frontend-build /app/public/build ./public/build
+
 # Copier le reste du code de l'application
 COPY . .
 
-# Créer les répertoires nécessaires et définir les permissions - avant de changer d'utilisateur
+# Créer les répertoires nécessaires et définir les permissions
 RUN mkdir -p storage/framework/{cache,data,sessions,testing,views} \
   && mkdir -p storage/logs \
   && mkdir -p bootstrap/cache \
@@ -47,12 +67,11 @@ RUN mkdir -p storage/framework/{cache,data,sessions,testing,views} \
 COPY start.sh /usr/local/bin/start.sh
 RUN chmod +x /usr/local/bin/start.sh
 
-USER root
+USER laravel
 
-# Exposer le port 9000 (port par défaut de Render)
-EXPOSE 9000
+# Exposer le port (Render utilise la variable d'environnement PORT)
+EXPOSE 10000
 
 # Commande par défaut pour Render
-# 👇 Un seul CMD qui exécute le script de démarrage
 CMD ["/usr/local/bin/start.sh"]
 
