@@ -64,41 +64,7 @@ class ComprehensiveTestSeeder extends Seeder
                     'statut' => 'actif',
                 ])
             );
-<<<<<<< HEAD
             $this->command->info("Utilisateur créé: {$user->nom} {$user->prenom} ({$user->telephone}) - {$user->type}");
-=======
-            $this->command->info("Fournisseur créé: {$fournisseur->nom} {$fournisseur->prenom} ({$fournisseur->telephone})");
-        }
-
-        // === UTILISATEURS EN ATTENTE ===
-        $this->command->info('Création des utilisateurs en attente...');
-
-        $pendingUsers = [
-            [
-                'nom' => 'Nouvel',
-                'prenom' => 'Client',
-                'telephone' => '770000040',
-                'email' => 'nouvel.client@test.com',
-                'type' => 'client',
-            ],
-            [
-                'nom' => 'Nouveau',
-                'prenom' => 'Commercant',
-                'telephone' => '770000041',
-                'email' => 'nouveau.commercant@test.com',
-                'type' => 'commercant',
-            ],
-        ];
-
-        foreach ($pendingUsers as $pendingData) {
-            $pending = User::updateOrCreate(
-                ['telephone' => $pendingData['telephone']],
-                array_merge($pendingData, [
-                    'password' => Hash::make($password),
-                    'statut' => 'en_attente',
-                ])
-            );
-            $this->command->info("Utilisateur en attente créé: {$pending->nom} {$pending->prenom} ({$pending->telephone}) - {$pending->type}");
         }
 
         // === TRANSACTIONS DE TEST ===
@@ -161,7 +127,6 @@ class ComprehensiveTestSeeder extends Seeder
 
                 $this->command->info('Transactions de test créées avec succès');
             }
->>>>>>> 71ebfc9 (prete a deployer)
         }
 
         // === RÉSUMÉ ===
@@ -176,3 +141,4 @@ class ComprehensiveTestSeeder extends Seeder
         });
     }
 }
+
